@@ -1,0 +1,50 @@
+name: CI and E2E Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install --ignore-scripts
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Start Vite Development Server
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:5173 --timeout 30000
+
+      - name: Run E2E Tests
+        run: npm test
+
+      - name: Convert Test Report to Excel
+        if: always()
+        run: npm run report:e2e || true
+
+      - name: Upload Test Reports Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-reports
+          path: |
+            tests/e2e-report.csv
+            tests/e2e-report.xlsx
+            tests/error-screenshot.png

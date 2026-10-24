@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "tracking": {
+      "$orderId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 250" fill="none">
+  <!-- Top Orange Bar -->
+  <rect x="68" y="98" width="248" height="9" fill="#EE6521" />
+
+  <!-- Bottom Green Bar -->
+  <rect x="28" y="202" width="268" height="9" fill="#008538" />
+
+  <!-- fssai text -->
+  <g fill="#0C1D70" font-family="'Times New Roman', Georgia, serif" font-style="italic" font-weight="bold">
+    <!-- f -->
+    <path d="M128 65 C105 65 82 82 78 118 L64 175 C58 195 48 205 35 205 C28 205 24 200 24 200 L20 207 C20 207 29 216 43 216 C63 216 75 196 82 165 L96 112 C99 98 108 92 122 92 L128 65 Z" fill="#0C1D70" />
+    <!-- s s a i -->
+    <text x="112" y="188" font-size="105" letter-spacing="-2">s</text>
+    <text x="152" y="188" font-size="105" letter-spacing="-2">s</text>
+    <text x="192" y="188" font-size="105" letter-spacing="-2">a</text>
+    <text x="256" y="188" font-size="105" letter-spacing="-2">ı</text>
+  </g>
+
+  <!-- Seed and Leaf over 'i' -->
+  <g transform="translate(262, 58)">
+    <!-- Small seed -->
+    <ellipse cx="6" cy="22" rx="4.5" ry="4" fill="#8B4513" transform="rotate(-20 6 22)" />
+    <!-- Green Leaf -->
+    <path d="M8 21 C10 11 20 4 30 2 C28 14 18 22 8 21 Z" fill="#008538" />
+  </g>
+</svg>
