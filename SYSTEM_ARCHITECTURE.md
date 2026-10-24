@@ -2,6 +2,8 @@
 
 A high-level, clear overview of the architecture, data flow, and components powering the **A2ZEE MicroGreenz** Progressive Web Application (PWA).
 
+![A2ZEE MicroGreenz System Architecture Diagram](./public/system_architecture.jpg)
+
 ---
 
 ## 1. High-Level Architecture Diagram
