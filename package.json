@@ -20,7 +20,9 @@
 
     "deploy": "gh-pages -d dist",
 
-    "test": "node tests/e2e-runner-simple.js",
+    "test": "node tests/e2e-runner-simple.js && node tests/ai-agent.test.js",
+
+    "test:ai": "node tests/ai-agent.test.js",
 
     "test:e2e": "node tests/e2e-runner.js",
 

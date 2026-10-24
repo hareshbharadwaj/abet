@@ -79,6 +79,10 @@ graph TD
 * **Firebase Realtime DB**: Fast real-time sync for live order state transitions.
 
 ### D. External Services
+* **AI Recommendation Agent**:
+  * Powered by Google Gemini 2.5 Flash API (`gemini-2.5-flash`).
+  * Floating widget with custom A2ZEE smiling mascot avatar (`/ai_mascot.png`).
+  * Provides conversational nutritional guidance, tailored product recommendations, recipe ideas, and grow kit advice.
 * **Payment Processing**: Razorpay checkout modal supporting UPI, Credit/Debit cards, Net Banking, and Cash on Delivery (COD).
 * **Communication**:
   * SMTPJS for automated order receipts and transactional emails.

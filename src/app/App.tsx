@@ -29,6 +29,7 @@ import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 
 import { PublicInvoicePage } from './components/buyer/PublicInvoicePage';
 import { PaymentRedirectPage } from './components/buyer/PaymentRedirectPage';
+import { AIAssistantWidget } from './components/ai/AIAssistantWidget';
 
 // Initialize localStorage with demo data
 initializeStorage();
@@ -171,6 +172,7 @@ function AppRoutes() {
       </Routes>
 
       {user && <BottomNav />}
+      <AIAssistantWidget />
       <Toaster position="top-center" richColors />
     </div>
   );
