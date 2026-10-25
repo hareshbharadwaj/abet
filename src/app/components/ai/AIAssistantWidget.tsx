@@ -72,7 +72,7 @@ export function AIAssistantWidget() {
       const fallbackMsg: ChatMessage = {
         id: `ai-err-${Date.now()}`,
         sender: 'assistant',
-        text: "I recommend our delicious **Sunflower Microgreens** (₹149) and **Broccoli Microgreens** (₹159)! Both are packed with energy and vitamins.",
+        text: "I recommend our delicious **Green Gram** (₹50) and **Sunflower Microgreens** (₹150)! Both are packed with energy, protein, and vitamins.",
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, fallbackMsg]);
@@ -250,7 +250,7 @@ export function AIAssistantWidget() {
               </button>
             </div>
             <p className="text-[10px] text-center text-gray-400 mt-1.5">
-              Powered by Gemini 2.5 • A2ZEE Health & Culinary AI
+              Powered by A2ZEE Intelligent Health & Recommendation AI
             </p>
           </div>
         </div>

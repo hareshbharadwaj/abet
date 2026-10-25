@@ -20,9 +20,86 @@ function appendRow(test, role, action, result, details = '') {
   fs.appendFileSync(REPORT_CSV, row);
 }
 
-// Benchmark 1: Direct Gemini API Call & Recommendation Quality Test
+// Benchmark 1: SBERT Vector Embeddings Index & Ground Truth Alignment
+function testSbertVectorIndex() {
+  console.log('🧠 Step 1: Testing SBERT (all-MiniLM-L6-v2) Vector Embeddings Index...');
+  const embeddingsPath = 'src/data/productEmbeddings.json';
+  if (!fs.existsSync(embeddingsPath)) {
+    throw new Error('src/data/productEmbeddings.json not found! Run scripts/generate_embeddings.py first.');
+  }
+
+  const data = JSON.parse(fs.readFileSync(embeddingsPath, 'utf-8'));
+  console.log(`  📊 Loaded SBERT model: ${data.model}`);
+  console.log(`  📐 Vector Dimension: ${data.dimension} | Indexed Catalogue Items: ${data.items.length}`);
+
+  if (data.dimension !== 384) {
+    throw new Error(`Expected embedding dimension 384, found ${data.dimension}`);
+  }
+  if (!Array.isArray(data.items) || data.items.length < 20) {
+    throw new Error(`Expected at least 20 items in catalogue vector index, found ${data.items?.length}`);
+  }
+
+  // Verify ground truth prices for Green Gram, Black Gram, Horse Gram, Sunflower
+  const greenGram = data.items.find(i => i.name === 'Green Gram');
+  if (!greenGram || greenGram.prices['50g'] !== 50) {
+    throw new Error(`Green Gram price mismatch! Expected ₹50, got ${greenGram?.prices?.['50g']}`);
+  }
+  const sunflower = data.items.find(i => i.name === 'Sunflower');
+  if (!sunflower || sunflower.prices['50g'] !== 150) {
+    throw new Error(`Sunflower price mismatch! Expected ₹150, got ${sunflower?.prices?.['50g']}`);
+  }
+
+  console.log('  ✅ SBERT vector index verified: 384-dimensional embeddings aligned with catalogue truth.');
+  appendRow('SBERT NLP', 'all-MiniLM-L6-v2', 'Vector Index Verification', 'PASS', `Dim: 384, Items: ${data.items.length}, Exact Prices Validated`);
+}
+
+// Benchmark 2: Local Ollama Embedding & Generation Test (optional in headless CI)
+async function testOllamaLocalService() {
+  console.log('\n🦙 Step 2: Testing Local Ollama Model & Embeddings API...');
+  try {
+    const health = await fetch('http://127.0.0.1:11434', { method: 'GET' });
+    if (!health.ok) {
+      console.log('  ℹ️ Local Ollama service not running on port 11434. Skipping local daemon test.');
+      appendRow('Local Ollama', 'all-minilm', 'Daemon Connection', 'SKIPPED', 'Local Ollama not active on port 11434');
+      return;
+    }
+
+    // Test embeddings endpoint
+    const embStart = Date.now();
+    const embRes = await fetch('http://127.0.0.1:11434/api/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'all-minilm', prompt: 'high protein greens' })
+    });
+    if (embRes.ok) {
+      const embData = await embRes.json();
+      const elapsed = Date.now() - embStart;
+      console.log(`  ✅ Ollama all-minilm embedding generated in ${elapsed}ms (dim: ${embData.embedding?.length})`);
+      appendRow('Local Ollama', 'all-minilm', 'Embeddings Query', 'PASS', `Latency: ${elapsed}ms, Dim: ${embData.embedding?.length}`);
+    }
+
+    // Test generation endpoint
+    const genStart = Date.now();
+    const genRes = await fetch('http://127.0.0.1:11434/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama3.2:1b', prompt: 'Say hi from A2ZEE', stream: false })
+    });
+    if (genRes.ok) {
+      const genData = await genRes.json();
+      const elapsed = Date.now() - genStart;
+      console.log(`  ✅ Ollama llama3.2:1b generation completed in ${elapsed}ms: "${genData.response?.trim()}"`);
+      appendRow('Local Ollama', 'llama3.2:1b', 'Local Text Generation', 'PASS', `Latency: ${elapsed}ms`);
+    }
+  } catch (err) {
+    console.log(`  ℹ️ Ollama local test skipped or unavailable: ${err.message}`);
+    appendRow('Local Ollama', 'llama3.2:1b', 'Daemon Connection', 'SKIPPED', err.message);
+  }
+}
+
+// Benchmark 3: Direct Cloud AI API Call & Recommendation Quality Test
 async function testAIApiPerformance() {
-  console.log('🤖 Step 1: Testing Direct Gemini AI API Performance...');
+  console.log('\n🤖 Step 3: Testing Direct Cloud AI API Performance...');
   if (!GEMINI_API_KEY) {
     console.log('  ℹ️ VITE_GEMINI_API_KEY not provided in environment. Skipping direct cloud API call.');
     appendRow('AI Performance', 'Gemini 2.5 Flash', 'Direct API Call', 'SKIPPED', 'No API key provided in CI secrets');
@@ -164,6 +241,8 @@ async function testAIWidgetInBrowser() {
 async function run() {
   console.log('🚀 Running AI Recommendation Agent Test Suite...\n');
   try {
+    testSbertVectorIndex();
+    await testOllamaLocalService();
     await testAIApiPerformance();
     await testAIWidgetInBrowser();
     console.log('\n🎉 AI Performance & Integration Benchmarks PASSED!\n');
