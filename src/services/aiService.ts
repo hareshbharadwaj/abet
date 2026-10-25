@@ -84,32 +84,35 @@ RECOMMENDATION RULES:
  * Queries local Ollama instance (e.g. llama3.2:1b) if available.
  */
 async function askLocalOllama(prompt: string, systemPrompt: string): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const endpoints = ['/ollama/api/generate', 'http://127.0.0.1:11434/api/generate'];
+  for (const endpoint of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch('http://127.0.0.1:11434/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama3.2:1b',
-        system: systemPrompt,
-        prompt: prompt,
-        stream: false
-      }),
-      signal: controller.signal
-    });
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama3.2:1b',
+          system: systemPrompt,
+          prompt: prompt,
+          stream: false
+        }),
+        signal: controller.signal
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.response && data.response.trim().length > 0) {
-        return data.response.trim();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.response && data.response.trim().length > 0) {
+          return data.response.trim();
+        }
       }
+    } catch {
+      // Continue to next endpoint or fallback
     }
-  } catch {
-    // Ollama not reachable from browser
   }
   return null;
 }
@@ -132,7 +135,11 @@ export async function askAIAgentDetailed(
   }
 
   const groundTruthSnippet = buildGroundTruthPromptSnippet(topMatches);
-  const dynamicSystemPrompt = SITE_KNOWLEDGE_SYSTEM_PROMPT + groundTruthSnippet;
+  const dynamicSystemPrompt = SITE_KNOWLEDGE_SYSTEM_PROMPT + `
+CONVERSATIONAL GUIDELINES:
+- When asked an informational question (e.g., explaining what microgreens are, how to eat them, how to store them), ALWAYS ANSWER THE QUESTION DIRECTLY AND CONCISELY FIRST. Do not just dump product recommendations.
+- Keep responses short, direct, friendly, and structured.
+` + groundTruthSnippet;
 
   let replyText = '';
 
@@ -179,14 +186,14 @@ export async function askAIAgentDetailed(
         }
       } else {
         const errText = await response.text();
-        console.warn("Primary cloud AI error, switching to local NLP model:", errText);
+        console.warn("Primary cloud AI response note:", errText);
       }
     } catch (error) {
-      console.warn("Error calling primary cloud AI, switching to local NLP model:", error);
+      console.warn("Error calling primary cloud AI:", error);
     }
   }
 
-  // Step 3: Try local Ollama model if available and cloud didn't answer
+  // Step 3: Try local Ollama model (llama3.2:1b)
   if (!replyText) {
     const localReply = await askLocalOllama(userMessage, dynamicSystemPrompt);
     if (localReply) {
@@ -225,45 +232,130 @@ export async function askAIAgent(
 }
 
 /**
- * Intelligent SBERT-grounded recommendation generator
- * Generates instant, 100% accurate recommendations matching catalogueData.ts
+ * Intelligent SBERT-grounded conversational recommendation engine.
+ * Converses naturally, answers questions directly, and pairs with accurate catalogue products.
  */
 export function getDynamicSbertRecommendation(input: string, matches?: SemanticProduct[]): string {
+  const query = input.toLowerCase().trim();
+
+  // 1. Informational: What are microgreens & What are they used for?
+  if (
+    query.includes('what is') || 
+    query.includes('what are') || 
+    query.includes('explan') || 
+    query.includes('meaning') || 
+    query.includes('used for') ||
+    query.includes('use of microgreen')
+  ) {
+    return `🌱 **What are Microgreens?**
+Microgreens are young vegetable greens harvested just **7 to 14 days** after germination, right after the first true leaves appear. Though tiny, scientific studies show they contain **4 to 40 times higher nutrient density** (vitamins C, E, K, lutein, and iron) than their mature vegetable counterparts!
+
+🍽️ **What are they used for?**
+• **Daily Cooking**: Toss a handful into warm dal, rasam, upma, or khichdi right before serving.
+• **Crunchy Salads & Bowls**: Use sunflower shoots or pea shoots as a flavorful, crisp base.
+• **Smoothies & Juices**: Blend wheatgrass or flax greens for a live chlorophyll energy shot.
+• **Sandwiches & Toasts**: Layer radish or mustard greens for a spicy wasabi-like kick.
+
+Popular picks to get started: **Green Gram (₹50)** for protein, **Sunflower (₹150)** for crunch, or our **Everyday Family Box (₹250)**!`;
+  }
+
+  // 2. How to eat / cooking tips
+  if (query.includes('how to eat') || query.includes('how to cook') || query.includes('cooking') || query.includes('recipe') || query.includes('raw')) {
+    return `🥗 **How to Enjoy Microgreens:**
+• **Eat Fresh & Raw**: Microgreens are best consumed raw or lightly tossed so their heat-sensitive enzymes and vitamins stay intact.
+• **The Residual Heat Method**: If adding to cooked food (like sambar, pongal, or fried rice), stir them in *after turning off the flame*. The residual steam gently wilts them without degrading the nutrients.
+• **Daily Serving Size**: 20g–30g (a generous fistful) daily provides all the micronutrients your body needs!`;
+  }
+
+  // 3. How to store & shelf life
+  if (query.includes('store') || query.includes('shelf') || query.includes('fridge') || query.includes('preserve') || query.includes('spoil')) {
+    return `❄️ **Storage & Freshness Tips:**
+• Keep your microgreens refrigerated between **4°C and 8°C** in their ventilated pack.
+• Keep them dry; only rinse what you are about to eat immediately.
+• Harvested fresh the morning of delivery, they stay crisp and nutrient-packed for **5 to 7 days** in your fridge!`;
+  }
+
+  // 4. Greetings & Who are you
+  if (query === 'hi' || query === 'hello' || query === 'hey' || query.includes('who are you') || query.includes('who r u')) {
+    return `👋 **Hello! I'm Zee**, your AI advisor for A2ZEE MicroGreenz!
+I can answer your questions, explain recipes and health benefits, or recommend the best fresh microgreens for your routine (e.g. workout recovery, diabetes balance, or everyday salads).
+
+What would you like to know or explore today?`;
+  }
+
+  // 5. Protein & Workout Goals
+  if (query.includes('protein') || query.includes('gym') || query.includes('workout') || query.includes('muscle') || query.includes('fitness')) {
+    return `💪 For workout recovery and lean muscle building, microgreens provide clean, easily absorbed plant protein, folate, and iron without digestive heaviness.
+
+Top varieties for stamina and fitness:
+• **Green Gram (பாசிப்பயறு) — ₹50 / 50g**: Highest plant protein (24%), iron, and sustained stamina.
+• **Black Gram (உளுந்து) — ₹50 / 50g**: Classic Tamil strength green for bone and muscle endurance.
+• **Horse Gram (கொள்ளு) — ₹60 / 50g**: Siddha kitchen superfood for metabolic burn and lean strength.`;
+  }
+
+  // 6. Salad & Culinary Crunch
+  if (query.includes('salad') || query.includes('crunch') || query.includes('taste') || query.includes('flavour')) {
+    return `🥗 For daily salads, microgreens offer superior crunch and intense gourmet flavor compared to regular lettuce.
+
+Best picks for texture and taste:
+• **Sunflower Microgreens (₹150 / 50g)**: Thick, succulent crunchy stems with sweet, nutty flavor. Our #1 salad star!
+• **Peas Shoots (₹150 / 50g)**: Sweet, crunchy shoots that children absolutely love.
+• **White Radish (₹150 / 50g)**: Adds a zesty peppery kick to any bowl.
+• **Everyday Family Box (₹250)**: 4 mild staples in one convenient kit!`;
+  }
+
+  // 7. Diabetes & Blood Sugar
+  if (query.includes('sugar') || query.includes('diabet') || query.includes('insulin') || query.includes('glycemic')) {
+    return `🩸 For blood sugar management, high-fibre greens with slow-release carbs help maintain steady glucose without insulin spikes.
+
+Top varieties for sugar balance:
+• **Fenugreek (வெந்தயம்) — ₹50 / 50g**: Celebrated in traditional wellness for insulin sensitivity and glucose moderation.
+• **Ragi (கேழ்வரகு) — ₹75 / 50g**: Slow-release complex energy with high calcium and iron.
+• **Pearl Millet (கம்பு) — ₹75 / 50g**: Cooling millet green rich in magnesium to avoid glycemic spikes.`;
+  }
+
+  // 8. Immunity & Detox
+  if (query.includes('detox') || query.includes('immunity') || query.includes('cleanse') || query.includes('cancer') || query.includes('liver')) {
+    return `🛡️ For cellular detoxification and immune defence, living microgreens provide intense antioxidants and pure chlorophyll.
+
+Top choices for deep cleansing:
+• **Wheatgrass (₹100 / 50g)**: Pure chlorophyll daily detox juice shot for blood purification.
+• **White Radish (₹150 / 50g)**: Rich in sulphur antioxidants and vitamin C for liver enzyme stimulation.
+• **Mustard (₹75 / 50g)**: Peppery wasabi-like kick packed with Vitamins A, C, and E.
+• **Immunity & Detox Box (₹475)**: Complete 4-variety cleansing pack!`;
+  }
+
+  // 9. Heart & Cholesterol
+  if (query.includes('heart') || query.includes('cholesterol') || query.includes('omega') || query.includes('bp') || query.includes('blood pressure')) {
+    return `❤️ For cardiovascular wellness and cholesterol balance, microgreens rich in plant Omega-3 (ALA), vitamin E, and good fats are ideal.
+
+Top heart health selections:
+• **Flax Microgreens (₹100 / 50g)**: Richest plant source of Omega-3 ALA and lignans.
+• **Chia Microgreens (₹100 / 50g)**: Delicate green with calcium, antioxidants, and healthy fats.
+• **Heart & Vitality Box (₹425)**: Contains Flax, Chia, Sesame, and Sunflower in a single kit!`;
+  }
+
+  // 10. Default SBERT recommendation if matches exist
   if (matches && matches.length > 0) {
-    const list = matches.map(m => {
+    const list = matches.slice(0, 3).map(m => {
       const tamil = m.tamilName ? ` (${m.tamilName})` : '';
       return `• **${m.name}**${tamil} — **${m.priceText}**\n  *Nutrients*: ${m.keyNutrients.slice(0, 4).join(', ')}\n  *Best For*: ${m.bestFor}`;
     }).join('\n\n');
 
-    return `🌿 **A2ZEE Smart Recommendations based on your goal:**\n\n${list}\n\n🛒 You can add these fresh greens to your cart or order directly on WhatsApp!`;
+    return `🌿 Based on your request, here are our recommended fresh greens from the catalogue:\n\n${list}\n\nClick any **View Card** button to inspect details and place an order!`;
   }
 
-  const query = input.toLowerCase();
+  return `🌿 **Welcome to A2ZEE MicroGreenz!**
+I can answer your questions, share serving ideas, or recommend the best fresh greens:
+1. **Green Gram (₹50 / 50g)** — Plant protein champion for muscle & stamina.
+2. **Sunflower (₹150 / 50g)** — Nutty, crunchy salad superstar.
+3. **Everyday Family Box (₹250)** — 4 mild staples for family meals.
 
-  if (query.includes('salad') || query.includes('crunch') || query.includes('taste')) {
-    return `🥗 **Top Salad Recommendations:**\n\n• **Sunflower Microgreens (₹150 / 50g)**: Thick crunchy stems with sweet, nutty flavor. Our #1 salad base!\n• **Peas Shoots (₹150 / 50g)**: Sweet, crunchy, succulent shoots children love.\n• **White Radish (₹150 / 50g)**: Adds a zesty peppery kick to any bowl.\n\n💡 *Tip: Try our **Everyday Family Box (₹250)** or **Chef's Premium Salad Box (₹850)**!*`;
-  }
-
-  if (query.includes('protein') || query.includes('gym') || query.includes('workout') || query.includes('muscle')) {
-    return `💪 **High Protein & Workout Recommendations:**\n\n• **Green Gram (பாசிப்பயறு) — ₹50 / 50g**: Highest plant protein (24%), fibre for digestion & sustained energy.\n• **Black Gram (உளுந்து) — ₹50 / 50g**: Classic Tamil stamina green packed with protein, iron & calcium.\n• **Horse Gram (கொள்ளு) — ₹60 / 50g**: Siddha kitchen superfood for metabolic burn and lean strength.\n\n⚡ *Add a handful to your warm dal, post-workout bowl or smoothie!*`;
-  }
-
-  if (query.includes('heart') || query.includes('cholesterol') || query.includes('omega')) {
-    return `❤️ **Cardiovascular & Omega-3 Recommendations:**\n\n• **Flax Microgreens (₹100 / 50g)**: Highest plant source of Omega-3 (ALA) and lignans.\n• **Chia Microgreens (₹100 / 50g)**: Calcium, antioxidants, and essential healthy fats.\n• **Sunflower (₹150 / 50g)**: Vitamin E and zinc for vascular wellness.\n\n💡 *Or grab our **Heart & Vitality Box (₹425)** containing Flax, Chia, Sesame & Sunflower!*`;
-  }
-
-  if (query.includes('sugar') || query.includes('diabet') || query.includes('insulin')) {
-    return `🩸 **Blood Sugar & Balance Recommendations:**\n\n• **Fenugreek (வெந்தயம்) — ₹50 / 50g**: Traditionally celebrated for insulin sensitivity and glucose balance.\n• **Ragi (கேழ்வரகு) — ₹75 / 50g**: Slow-release complex carbohydrates with high calcium and iron.\n• **Pearl Millet (கம்பு) — ₹75 / 50g**: Cooling millet green with magnesium to avoid glycemic spikes.`;
-  }
-
-  if (query.includes('detox') || query.includes('immunity') || query.includes('cleanse')) {
-    return `🛡️ **Immunity & Deep Detox Recommendations:**\n\n• **White Radish (₹150 / 50g)**: Rich in sulphur antioxidants and vitamin C for liver cleansing.\n• **Wheatgrass (₹100 / 50g)**: Pure chlorophyll detox juice shot.\n• **Mustard (₹75 / 50g)**: Peppery wasabi-like kick loaded with Vitamins A, C, and E.\n\n🌱 *Check out our **Immunity & Detox Box (₹475)**!*`;
-  }
-
-  return `🌿 **Welcome to A2ZEE MicroGreenz!**\n\nI can recommend the perfect living microgreens for your health and taste goals:\n\n1. **Green Gram (₹50 / 50g)** — Plant-protein champion for muscle & stamina.\n2. **Sunflower (₹150 / 50g)** — Nutty, crunchy salad superstar.\n3. **Garden Cress (₹200 / 50g)** — Iron powerhouse for blood building.\n4. **Everyday Family Box (₹250)** — 4 mild staples perfect for family meals.\n\nTell me: What health goal or flavour are you looking for today?`;
+Tell me: What health goal, flavour, or question do you have today?`;
 }
 
 export function getFallbackRecommendation(input: string): string {
   return getDynamicSbertRecommendation(input);
 }
+
 

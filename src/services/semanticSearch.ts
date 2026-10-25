@@ -53,30 +53,33 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  * Attempts to get real-time query vector embedding from local Ollama all-minilm.
  */
 async function getQueryEmbeddingFromOllama(query: string): Promise<number[] | null> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1200);
+  const endpoints = ['/ollama/api/embeddings', 'http://127.0.0.1:11434/api/embeddings'];
+  for (const endpoint of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-    const res = await fetch('http://127.0.0.1:11434/api/embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'all-minilm',
-        prompt: query
-      }),
-      signal: controller.signal
-    });
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'all-minilm',
+          prompt: query
+        }),
+        signal: controller.signal
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.embedding) && data.embedding.length === dataset.dimension) {
-        return data.embedding;
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.embedding) && data.embedding.length === dataset.dimension) {
+          return data.embedding;
+        }
       }
+    } catch {
+      // Try next endpoint or fallback
     }
-  } catch {
-    // Ollama not reachable from browser context or offline
   }
   return null;
 }
