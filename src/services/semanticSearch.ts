@@ -180,3 +180,44 @@ export function buildGroundTruthPromptSnippet(matches: SemanticProduct[]): strin
 
   return `\n\n[VERIFIED GROUND TRUTH FROM A2ZEE CATALOGUE - SBERT VECTOR MATCH]:\nWhen recommending, you MUST use these exact prices and names:\n\n${bulletList}\n\nDo not make up any other prices or products!`;
 }
+
+/**
+ * Returns all products & curated boxes in the catalogue dataset.
+ */
+export function getAllCatalogueItems(): SemanticProduct[] {
+  return dataset.items;
+}
+
+/**
+ * Maps a range title to its rangeId in LandingPage (range-01 ... range-06).
+ */
+export function getRangeIdByName(rangeName?: string): string {
+  if (!rangeName) return 'range-01';
+  if (rangeName.includes('Protein')) return 'range-01';
+  if (rangeName.includes('Heart') || rangeName.includes('Omega')) return 'range-02';
+  if (rangeName.includes('Sugar') || rangeName.includes('Weight')) return 'range-03';
+  if (rangeName.includes('Immunity') || rangeName.includes('Defence') || rangeName.includes('Eye')) return 'range-04';
+  if (rangeName.includes('Iron') || rangeName.includes('Detox') || rangeName.includes('Blood')) return 'range-05';
+  if (rangeName.includes('Sprout')) return 'range-06';
+  return 'range-01';
+}
+
+/**
+ * Detects any catalogue products or curated boxes mentioned in a text response.
+ */
+export function detectProductsInText(text: string): SemanticProduct[] {
+  const lower = text.toLowerCase();
+  const matched: SemanticProduct[] = [];
+  const addedIds = new Set<string>();
+
+  for (const item of dataset.items) {
+    const nameLower = item.name.toLowerCase();
+    if (lower.includes(nameLower) && !addedIds.has(item.id)) {
+      matched.push(item);
+      addedIds.add(item.id);
+    }
+  }
+
+  return matched;
+}
+

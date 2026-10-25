@@ -1,4 +1,12 @@
-import { searchSemanticCatalogue, buildGroundTruthPromptSnippet, type SemanticProduct } from './semanticSearch';
+import { 
+  searchSemanticCatalogue, 
+  buildGroundTruthPromptSnippet, 
+  detectProductsInText,
+  getRangeIdByName,
+  type SemanticProduct 
+} from './semanticSearch';
+
+export { getRangeIdByName, type SemanticProduct };
 
 export interface ChatMessage {
   id: string;
@@ -106,10 +114,15 @@ async function askLocalOllama(prompt: string, systemPrompt: string): Promise<str
   return null;
 }
 
-export async function askAIAgent(
+export interface AIResponseDetailed {
+  text: string;
+  recommendedProducts: SemanticProduct[];
+}
+
+export async function askAIAgentDetailed(
   userMessage: string,
   conversationHistory: { role: 'user' | 'model'; text: string }[] = []
-): Promise<string> {
+): Promise<AIResponseDetailed> {
   // Step 1: Compute SBERT semantic vector matches from the catalog
   let topMatches: SemanticProduct[] = [];
   try {
@@ -120,6 +133,8 @@ export async function askAIAgent(
 
   const groundTruthSnippet = buildGroundTruthPromptSnippet(topMatches);
   const dynamicSystemPrompt = SITE_KNOWLEDGE_SYSTEM_PROMPT + groundTruthSnippet;
+
+  let replyText = '';
 
   // Step 2: Try Gemini API if key is present
   if (GEMINI_URL && GEMINI_API_KEY) {
@@ -160,7 +175,7 @@ export async function askAIAgent(
         const data = await response.json();
         const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (candidateText && candidateText.trim().length > 0) {
-          return candidateText.trim();
+          replyText = candidateText.trim();
         }
       } else {
         const errText = await response.text();
@@ -171,14 +186,42 @@ export async function askAIAgent(
     }
   }
 
-  // Step 3: Try local Ollama model if available
-  const localReply = await askLocalOllama(userMessage, dynamicSystemPrompt);
-  if (localReply) {
-    return localReply;
+  // Step 3: Try local Ollama model if available and cloud didn't answer
+  if (!replyText) {
+    const localReply = await askLocalOllama(userMessage, dynamicSystemPrompt);
+    if (localReply) {
+      replyText = localReply;
+    }
   }
 
   // Step 4: Fallback to high-precision SBERT semantic recommendation
-  return getDynamicSbertRecommendation(userMessage, topMatches);
+  if (!replyText) {
+    replyText = getDynamicSbertRecommendation(userMessage, topMatches);
+  }
+
+  // Step 5: Gather all relevant products (both vector matches and any mentioned in replyText)
+  const detected = detectProductsInText(replyText);
+  const combinedMap = new Map<string, SemanticProduct>();
+
+  for (const item of topMatches) {
+    combinedMap.set(item.id, item);
+  }
+  for (const item of detected) {
+    combinedMap.set(item.id, item);
+  }
+
+  return {
+    text: replyText,
+    recommendedProducts: Array.from(combinedMap.values()).slice(0, 4)
+  };
+}
+
+export async function askAIAgent(
+  userMessage: string,
+  conversationHistory: { role: 'user' | 'model'; text: string }[] = []
+): Promise<string> {
+  const detailed = await askAIAgentDetailed(userMessage, conversationHistory);
+  return detailed.text;
 }
 
 /**

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Sparkles, Bot, RefreshCw, ChevronDown } from 'lucide-react';
-import { askAIAgent, ChatMessage } from '../../../services/aiService';
+import { MessageSquare, X, Send, Sparkles, ArrowRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { askAIAgentDetailed, getRangeIdByName, type SemanticProduct, type ChatMessage } from '../../../services/aiService';
 import { useAuth } from '../../../contexts/AuthContext';
+import allProductsData from '../../../data/productEmbeddings.json';
+
+const allCatalogueItems: SemanticProduct[] = ((allProductsData as any)?.items || []) as SemanticProduct[];
 
 export function AIAssistantWidget() {
   const { user } = useAuth();
@@ -36,6 +39,47 @@ export function AIAssistantWidget() {
     }
   }, [isOpen, messages]);
 
+  /**
+   * Navigates directly to the product or box card on the website
+   * and highlights it with an animated glow.
+   */
+  const navigateToProduct = (productId: string, rangeId?: string, isBox?: boolean) => {
+    // If user is currently on another subpage, navigate to homepage
+    const currentHash = window.location.hash || '';
+    if (currentHash && currentHash !== '#/' && !currentHash.startsWith('#/?')) {
+      window.location.hash = '#/';
+    }
+
+    // Dispatch event so LandingPage can activate range and scroll
+    window.dispatchEvent(new CustomEvent('a2zee-navigate-product', {
+      detail: { productId, rangeId, isBox }
+    }));
+
+    // If card exists in the DOM right now, scroll and pulse highlight
+    setTimeout(() => {
+      const targetId = isBox ? `box-card-${productId}` : `product-card-${productId}`;
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl', 'transition-all', 'duration-500');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl');
+        }, 3000);
+      } else {
+        const section = isBox ? document.getElementById('boxes') : document.getElementById('catalogue');
+        section?.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 150);
+  };
+
+  /**
+   * Helper to find which catalogue product matches a line of text.
+   */
+  const findProductInLine = (line: string): SemanticProduct | undefined => {
+    const lineLower = line.toLowerCase();
+    return allCatalogueItems.find(p => lineLower.includes(p.name.toLowerCase()));
+  };
+
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query || isLoading) return;
@@ -57,22 +101,25 @@ export function AIAssistantWidget() {
         text: m.text,
       }));
 
-      const reply = await askAIAgent(query, history);
+      const { text, recommendedProducts } = await askAIAgentDetailed(query, history);
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'assistant',
-        text: reply,
+        text,
+        recommendedProducts,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiMsg]);
     } catch (err) {
       console.error("AI chat error:", err);
+      const fallbackProducts = allCatalogueItems.filter(p => p.id === 'mc-01' || p.id === 'mc-08');
       const fallbackMsg: ChatMessage = {
         id: `ai-err-${Date.now()}`,
         sender: 'assistant',
         text: "I recommend our delicious **Green Gram** (₹50) and **Sunflower Microgreens** (₹150)! Both are packed with energy, protein, and vitamins.",
+        recommendedProducts: fallbackProducts,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, fallbackMsg]);
@@ -88,10 +135,9 @@ export function AIAssistantWidget() {
     }
   };
 
-  // Format basic bold and bullet lists in AI replies
+  // Format basic bold, bullet lists, and inject action button near product details
   const renderFormattedText = (text: string) => {
     return text.split('\n').map((line, idx) => {
-      // Bold rendering
       const parts = line.split(/(\*\*.*?\*\*)/g);
       const formattedParts = parts.map((part, pIdx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -100,10 +146,29 @@ export function AIAssistantWidget() {
         return part;
       });
 
+      // Detect if this line describes a specific product
+      const matchedProduct = findProductInLine(line);
+      const isBulletOrHeading = line.trim().startsWith('•') || line.trim().startsWith('-') || /^\d+\./.test(line.trim());
+
       return (
-        <span key={idx} className="block leading-relaxed">
-          {formattedParts}
-        </span>
+        <div key={idx} className="leading-relaxed my-0.5 flex flex-wrap items-center gap-1.5">
+          <span>{formattedParts}</span>
+          {matchedProduct && isBulletOrHeading && (
+            <button
+              type="button"
+              onClick={() => navigateToProduct(
+                matchedProduct.id, 
+                getRangeIdByName(matchedProduct.range), 
+                matchedProduct.type === 'curated_box' || matchedProduct.id.startsWith('box-')
+              )}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs transition-transform active:scale-95 cursor-pointer"
+              title={`View ${matchedProduct.name} on catalogue card`}
+            >
+              <span>View Card</span>
+              <ArrowRight className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
       );
     });
   };
@@ -114,7 +179,7 @@ export function AIAssistantWidget() {
       {isOpen && (
         <div
           id="ai-chat-window"
-          className="w-[92vw] sm:w-[380px] h-[520px] max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-emerald-100 flex flex-col overflow-hidden mb-3 animate-in fade-in slide-in-from-bottom-5 duration-200"
+          className="w-[92vw] sm:w-[400px] h-[550px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-emerald-100 flex flex-col overflow-hidden mb-3 animate-in fade-in slide-in-from-bottom-5 duration-200"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-700 via-green-600 to-emerald-800 text-white p-4 flex items-center justify-between shadow-md">
@@ -142,7 +207,7 @@ export function AIAssistantWidget() {
               <button
                 id="ai-chat-close"
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-full hover:bg-white/10 text-white/90 transition-colors"
+                className="p-1.5 rounded-full hover:bg-white/10 text-white/90 transition-colors cursor-pointer"
                 title="Minimize chat"
                 aria-label="Close"
               >
@@ -170,7 +235,7 @@ export function AIAssistantWidget() {
                 )}
 
                 <div
-                  className={`max-w-[82%] rounded-2xl p-3.5 shadow-sm text-[13.5px] ${
+                  className={`max-w-[85%] rounded-2xl p-3.5 shadow-sm text-[13.5px] ${
                     msg.sender === 'user'
                       ? 'bg-emerald-600 text-white rounded-tr-xs'
                       : 'bg-white text-gray-800 border border-gray-100 rounded-tl-xs'
@@ -178,13 +243,63 @@ export function AIAssistantWidget() {
                 >
                   {renderFormattedText(msg.text)}
 
+                  {/* Dedicated Product Recommendation Cards with Direct Navigation Button */}
+                  {msg.recommendedProducts && msg.recommendedProducts.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-emerald-100 flex flex-col gap-2">
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        Recommended Product Cards:
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {msg.recommendedProducts.map((p) => {
+                          const isBox = p.type === 'curated_box' || p.id.startsWith('box-');
+                          const rangeId = getRangeIdByName(p.range);
+                          return (
+                            <div
+                              key={p.id}
+                              className="flex items-center justify-between gap-2 p-2 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/70 rounded-xl transition-all shadow-2xs group"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img
+                                  src={p.image || '/greengram.png'}
+                                  alt={p.name}
+                                  className="w-8 h-8 rounded-lg object-cover bg-white border border-emerald-200 shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/greengram.png';
+                                  }}
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-gray-900 truncate">
+                                    {p.name}
+                                  </p>
+                                  <p className="text-[11px] font-semibold text-emerald-700">
+                                    {p.priceText}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => navigateToProduct(p.id, rangeId, isBox)}
+                                className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer transition-transform active:scale-95"
+                              >
+                                <span>Go to Card</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {msg.suggestions && msg.suggestions.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap gap-1.5">
                       {msg.suggestions.map((sugg, sIdx) => (
                         <button
                           key={sIdx}
                           onClick={() => handleSend(sugg)}
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full transition-colors font-medium border border-emerald-200/60"
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full transition-colors font-medium border border-emerald-200/60 cursor-pointer"
                         >
                           {sugg}
                         </button>
@@ -239,51 +354,48 @@ export function AIAssistantWidget() {
                 id="ai-chat-send"
                 onClick={() => handleSend()}
                 disabled={!inputText.trim() || isLoading}
-                className={`p-2 rounded-xl transition-all ${
-                  inputText.trim() && !isLoading
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95'
-                    : 'text-gray-400 cursor-not-allowed'
-                }`}
+                className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white transition-all shadow-sm cursor-pointer"
+                title="Send Message"
                 aria-label="Send Message"
               >
                 <Send className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-[10px] text-center text-gray-400 mt-1.5">
+            <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">
               Powered by A2ZEE Intelligent Health & Recommendation AI
             </p>
           </div>
         </div>
       )}
 
-      {/* Floating Trigger Button */}
+      {/* Floating Mascot Button */}
       <button
         id="ai-assistant-toggle"
         onClick={() => setIsOpen(!isOpen)}
-        className="group relative flex items-center gap-2.5 bg-gradient-to-r from-emerald-600 via-green-600 to-emerald-700 text-white p-2 md:pl-2 md:pr-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 border-2 border-white/80"
-        title="Chat with Zee - A2ZEE AI Advisor"
-        aria-label="Open AI Assistant"
+        className="group relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-emerald-700 via-green-600 to-emerald-500 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 border-2 border-white/80 cursor-pointer"
+        aria-label="Toggle AI Advisor"
       >
-        <div className="relative">
-          <img
-            src="/ai_mascot.png"
-            alt="A2ZEE AI Mascot"
-            className="w-12 h-12 md:w-11 md:h-11 rounded-full object-cover border-2 border-white bg-white shadow-md group-hover:rotate-6 transition-transform"
-          />
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-green-400 border-2 border-white"></span>
-          </span>
-        </div>
+        <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping pointer-events-none group-hover:hidden"></div>
 
-        <div className="hidden md:flex flex-col text-left">
-          <span className="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-yellow-300" /> AI Advisor
-          </span>
-          <span className="text-sm font-bold text-white tracking-tight leading-tight">
-            Ask Zee
-          </span>
-        </div>
+        <img
+          src="/ai_mascot.png"
+          alt="Zee AI Assistant"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover p-0.5 bg-white shadow-xs"
+        />
+
+        {/* Status Bubble */}
+        <span className="absolute top-0 right-0 flex h-4 w-4">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 border-2 border-white"></span>
+        </span>
+
+        {/* Hover Tooltip */}
+        {!isOpen && (
+          <div className="absolute right-full mr-3 hidden sm:flex items-center px-3 py-1.5 bg-gray-900/90 backdrop-blur-sm text-white text-xs font-medium rounded-xl shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+            <span>Ask Zee AI • Smart Recommendations</span>
+            <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900/90"></div>
+          </div>
+        )}
       </button>
     </div>
   );

@@ -78,6 +78,47 @@ export function LandingPage() {
   const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const [isCatalogueInView, setIsCatalogueInView] = useState(true);
 
+  // Listen for navigation requests from the AI Assistant
+  useEffect(() => {
+    const handleNavigate = (e: any) => {
+      const { productId, rangeId, isBox } = e.detail || {};
+      if (isBox) {
+        setTimeout(() => {
+          const boxEl = document.getElementById(`box-card-${productId}`);
+          if (boxEl) {
+            boxEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            boxEl.classList.add('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl', 'transition-all', 'duration-500');
+            setTimeout(() => boxEl.classList.remove('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl'), 3000);
+          } else {
+            document.getElementById('boxes')?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+        return;
+      }
+
+      if (rangeId) {
+        setActiveRangeId(rangeId);
+        setSearchQuery('');
+      }
+
+      setTimeout(() => {
+        const cardEl = document.getElementById(`product-card-${productId}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          cardEl.classList.add('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl', 'transition-all', 'duration-500');
+          setTimeout(() => cardEl.classList.remove('ring-4', 'ring-emerald-500', 'scale-[1.03]', 'shadow-2xl'), 3000);
+        } else {
+          document.getElementById('catalogue')?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 150);
+    };
+
+    window.addEventListener('a2zee-navigate-product', handleNavigate);
+    return () => {
+      window.removeEventListener('a2zee-navigate-product', handleNavigate);
+    };
+  }, []);
+
   // WhatsApp Order Modal States
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [modalProduct, setModalProduct] = useState<any>(null);
@@ -480,6 +521,9 @@ export function LandingPage() {
               return (
                 <motion.div 
                   key={product.id}
+                  id={`product-card-${product.id}`}
+                  data-product-id={product.id}
+                  data-product-name={product.name.toLowerCase()}
                   layout
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -731,6 +775,9 @@ export function LandingPage() {
               return (
                 <motion.div 
                   key={box.id}
+                  id={`box-card-${box.id}`}
+                  data-box-id={box.id}
+                  data-box-name={box.name.toLowerCase()}
                   variants={fadeInUp}
                   onClick={() => {
                     setModalProduct({
