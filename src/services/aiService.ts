@@ -120,6 +120,89 @@ async function askLocalOllama(prompt: string, systemPrompt: string): Promise<str
 export interface AIResponseDetailed {
   text: string;
   recommendedProducts: SemanticProduct[];
+  suggestions?: string[];
+}
+
+export function generateContextualSuggestions(query: string, replyText: string): string[] {
+  const q = query.toLowerCase();
+
+  if (q.includes('protein') || q.includes('gym') || q.includes('workout') || q.includes('muscle')) {
+    return [
+      '🥗 Crunchy salad microgreens?',
+      '📦 Show Everyday Family Box',
+      '🍽️ Best time to eat Green Gram?'
+    ];
+  }
+
+  if (q.includes('salad') || q.includes('crunch') || q.includes('taste')) {
+    return [
+      '💪 Which greens have highest protein?',
+      '👶 Kid-friendly sweet peas shoot?',
+      '📦 Show Chef\'s Premium Salad Box'
+    ];
+  }
+
+  if (q.includes('sugar') || q.includes('diabet') || q.includes('insulin')) {
+    return [
+      '🌱 How to consume Fenugreek daily?',
+      '📦 Best starter box for blood sugar',
+      '🥗 Can I add microgreens to warm food?'
+    ];
+  }
+
+  if (q.includes('heart') || q.includes('cholesterol') || q.includes('omega') || q.includes('bp')) {
+    return [
+      '❤️ Show Heart & Vitality Box',
+      '🌱 Benefits of Flax & Chia microgreens',
+      '🚚 How fast is fresh delivery in Chennai?'
+    ];
+  }
+
+  if (q.includes('detox') || q.includes('immunity') || q.includes('cleanse') || q.includes('radish') || q.includes('wheatgrass')) {
+    return [
+      '🥤 How to juice Wheatgrass daily?',
+      '📦 Show Immunity & Detox Box',
+      '❄️ How to store microgreens in fridge?'
+    ];
+  }
+
+  if (q.includes('what is') || q.includes('what are') || q.includes('explan') || q.includes('used for')) {
+    return [
+      '💪 High protein varieties for gym',
+      '🥗 Best crunchy greens for daily salad',
+      '📦 Which combo box is best for beginners?'
+    ];
+  }
+
+  if (q.includes('store') || q.includes('shelf') || q.includes('fridge')) {
+    return [
+      '🍽️ How to add microgreens to hot food?',
+      '🥗 Best salad dressing for microgreens',
+      '📦 Show Curated Value Boxes'
+    ];
+  }
+
+  if (q.includes('box') || q.includes('combo') || q.includes('kit') || q.includes('curated')) {
+    return [
+      '📦 Everyday Family Box (₹250)',
+      '❤️ Heart & Vitality Box (₹425)',
+      '🛡️ Immunity & Detox Box (₹475)'
+    ];
+  }
+
+  if (q.includes('skin') || q.includes('hair') || q.includes('glow')) {
+    return [
+      '🥕 Carrot & Beetroot microgreens',
+      '🛡️ Show Immunity & Detox Box',
+      '🥤 Morning green smoothie recipe'
+    ];
+  }
+
+  return [
+    '🥗 Best for fresh daily salads',
+    '💪 Muscle recovery & high protein',
+    '📦 Recommended beginner combo box'
+  ];
 }
 
 export async function askAIAgentDetailed(
@@ -217,9 +300,12 @@ CONVERSATIONAL GUIDELINES:
     combinedMap.set(item.id, item);
   }
 
+  const suggestions = generateContextualSuggestions(userMessage, replyText);
+
   return {
     text: replyText,
-    recommendedProducts: Array.from(combinedMap.values()).slice(0, 4)
+    recommendedProducts: Array.from(combinedMap.values()).slice(0, 4),
+    suggestions
   };
 }
 
@@ -335,14 +421,33 @@ Top heart health selections:
 • **Heart & Vitality Box (₹425)**: Contains Flax, Chia, Sesame, and Sunflower in a single kit!`;
   }
 
-  // 10. Default SBERT recommendation if matches exist
+  // 10. Curated Boxes & Value Combos
+  if (query.includes('box') || query.includes('combo') || query.includes('kit') || query.includes('curated') || query.includes('package')) {
+    return `📦 **A2ZEE Curated Value Boxes:**
+Enjoy our chef-curated combos designed for specific health goals at great savings:
+• **Everyday Family Box (₹250)**: Green Gram, Black Gram, Ragi, Pearl Millet — mild daily nutrition for the whole family!
+• **Heart & Vitality Box (₹425)**: Flax, Chia, Sesame, Sunflower — rich in Omega-3 and Vitamin E.
+• **Immunity & Detox Box (₹475)**: Mustard, White Radish, Wheatgrass, Beetroot — deep cellular detox.
+• **Sprout & Green Kitchen Box (₹425)**: 500g Fresh Mung Sprouts + Green Gram, Fenugreek, Sunflower microgreens.
+• **Chef's Premium Salad Box (₹850)**: Lettuce, Garden Cress, Carrot, Peas, Amaranthus — gourmet dining at home!`;
+  }
+
+  // 11. Weight Management & Fat Burn
+  if (query.includes('weight') || query.includes('fat') || query.includes('burn') || query.includes('slim') || query.includes('diet')) {
+    return `🔥 For weight management and healthy metabolism, microgreens offer nutrient density with near-zero glycemic load:
+• **Horse Gram (கொள்ளu) — ₹60 / 50g**: Ancient Siddha superfood renowned for fat metabolism and long-lasting energy.
+• **Green Gram (பாசிப்பயறு) — ₹50 / 50g**: 24% clean protein keeps you satiated without extra calories.
+• **Fenugreek (வெந்தயம்) — ₹50 / 50g**: Helps stabilize insulin levels and suppresses sugar cravings.`;
+  }
+
+  // 12. Default SBERT recommendation if matches exist
   if (matches && matches.length > 0) {
     const list = matches.slice(0, 3).map(m => {
       const tamil = m.tamilName ? ` (${m.tamilName})` : '';
       return `• **${m.name}**${tamil} — **${m.priceText}**\n  *Nutrients*: ${m.keyNutrients.slice(0, 4).join(', ')}\n  *Best For*: ${m.bestFor}`;
     }).join('\n\n');
 
-    return `🌿 Based on your request, here are our recommended fresh greens from the catalogue:\n\n${list}\n\nClick any **View Card** button to inspect details and place an order!`;
+    return `🌿 Based on your request, here are our recommended fresh greens from the catalogue:\n\n${list}\n\nClick **View** to inspect the card or **⚡ Order** to purchase directly!`;
   }
 
   return `🌿 **Welcome to A2ZEE MicroGreenz!**

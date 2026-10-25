@@ -81,7 +81,37 @@ export function LandingPage() {
   // Listen for navigation requests from the AI Assistant
   useEffect(() => {
     const handleNavigate = (e: any) => {
-      const { productId, rangeId, isBox } = e.detail || {};
+      const { productId, rangeId, isBox, openModal } = e.detail || {};
+
+      if (openModal) {
+        if (isBox) {
+          const box = curatedBoxes.find(b => b.id === productId);
+          if (box) {
+            setModalProduct({
+              id: box.id,
+              name: box.name,
+              description: box.description,
+              price: box.price,
+              image: '',
+              items: box.items,
+              includesLabel: box.includesLabel
+            });
+            setModalType('box');
+            setIsOrderModalOpen(true);
+          }
+        } else {
+          const prod = products.find(p => p.id === productId);
+          if (prod) {
+            setModalProduct(prod);
+            setModalType('single');
+            const sizes = Object.keys(prod.prices);
+            if (sizes.length > 0) setSelectedSize(sizes[0]);
+            setOrderQuantity(1);
+            setIsOrderModalOpen(true);
+          }
+        }
+      }
+
       if (isBox) {
         setTimeout(() => {
           const boxEl = document.getElementById(`box-card-${productId}`);
