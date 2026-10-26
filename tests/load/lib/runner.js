@@ -56,6 +56,8 @@ export async function executeScenario(scenario, { timeoutMs = 15000 } = {}) {
   return {
     id: scenario.id,
     title: scenario.title,
+    category: scenario.category,
+    categoryName: scenario.categoryName,
     method: scenario.method,
     path: scenario.path,
     profile: scenario.profile,

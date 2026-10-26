@@ -12,6 +12,37 @@
 import fs from 'fs';
 import path from 'path';
 
+
+/** Report categories — mirrors the enterprise audit report layout. */
+export const CATEGORIES = [
+  { id: 'CAT-01', name: 'Cold Page Loads (HTML Shell)' },
+  { id: 'CAT-02', name: 'JavaScript Bundle Delivery' },
+  { id: 'CAT-03', name: 'Stylesheet Delivery' },
+  { id: 'CAT-04', name: 'Static Image Assets' },
+  { id: 'CAT-05', name: 'Cached Reload Behaviour' },
+  { id: 'CAT-06', name: 'HEAD Probe / Protocol' },
+  { id: 'CAT-07', name: 'Error Handling (404)' },
+  { id: 'CAT-08', name: 'Sustained Throughput' },
+  { id: 'CAT-09', name: 'Latency SLO Compliance' },
+  { id: 'CAT-10', name: 'Stability & Error Rate' },
+];
+
+const CATEGORY_BY_PROFILE = {
+  page: 'CAT-01',
+  bundle: 'CAT-02',
+  style: 'CAT-03',
+  image: 'CAT-04',
+  reload: 'CAT-05',
+  head: 'CAT-06',
+  '404': 'CAT-07',
+  throughput: 'CAT-08',
+  latency: 'CAT-09',
+  stability: 'CAT-10',
+};
+
+export const categoryFor = (profile) => CATEGORY_BY_PROFILE[profile] || 'CAT-01';
+export const categoryName = (id) => (CATEGORIES.find((entry) => entry.id === id) || {}).name || id;
+
 const encodePath = (value) =>
   value
     .split('/')
@@ -179,6 +210,8 @@ export function buildScenarios({ baseUrl, distDir, count = 300 }) {
     ...scenario,
     id: `LT-${String(index + 1).padStart(3, '0')}`,
     index: index + 1,
+    category: categoryFor(scenario.profile),
+    categoryName: categoryName(categoryFor(scenario.profile)),
     url: `${baseUrl.replace(/\/$/, '')}${encodePath(scenario.path)}`,
     label: `${String(index + 1).padStart(3, '0')}/${count} ${scenario.method} ${scenario.path}`,
   }));

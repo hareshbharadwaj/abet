@@ -13,7 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { CONFIG, REPORT_FILES } from './config.js';
-import { buildScenarios, discoverAssets } from './lib/scenarios.js';
+import { buildScenarios, categoryName, discoverAssets } from './lib/scenarios.js';
 import { aggregateByEndpoint, runLoadPhase, runScenarios } from './lib/runner.js';
 import {
   summaryMarkdown,
@@ -286,11 +286,69 @@ async function main() {
       });
 
   const checks = buildChecks(loadPhase);
+
+  /* SLO checks are reported as first-class load test cases so the workbook's
+     category table reconciles with the total case count. */
+  const sloResults = [
+    {
+      id: 'LT-301',
+      title: 'Sustained throughput meets the target request rate',
+      category: 'CAT-08',
+      categoryName: categoryName('CAT-08'),
+      method: 'LOAD',
+      path: 'sustained phase',
+      expected: '',
+      status: checks[0].passed ? 'PASS' : 'FAIL',
+      latencyMs: Math.round(loadPhase.averageMs),
+      averageMs: loadPhase.averageMs,
+      slaMs: CONFIG.thresholds.maxP95Ms,
+      requests: loadPhase.requests,
+      bytes: loadPhase.bytes,
+      error: checks[0].passed ? '' : `throughput ${loadPhase.rps} req/s below ${CONFIG.thresholds.minRps}`,
+    },
+    {
+      id: 'LT-302',
+      title: 'p95 latency stays within the performance budget',
+      category: 'CAT-09',
+      categoryName: categoryName('CAT-09'),
+      method: 'LOAD',
+      path: 'sustained phase',
+      expected: '',
+      status: checks[1].passed ? 'PASS' : 'FAIL',
+      latencyMs: Math.round(loadPhase.p95Ms),
+      averageMs: loadPhase.p95Ms,
+      slaMs: CONFIG.thresholds.maxP95Ms,
+      requests: loadPhase.requests,
+      bytes: loadPhase.bytes,
+      error: checks[1].passed ? '' : `p95 ${loadPhase.p95Ms}ms above ${CONFIG.thresholds.maxP95Ms}ms`,
+    },
+    {
+      id: 'LT-303',
+      title: 'Error rate stays within the availability budget',
+      category: 'CAT-10',
+      categoryName: categoryName('CAT-10'),
+      method: 'LOAD',
+      path: 'sustained phase',
+      expected: '',
+      status: checks[2].passed ? 'PASS' : 'FAIL',
+      latencyMs: 0,
+      averageMs: 0,
+      slaMs: '',
+      requests: loadPhase.requests,
+      bytes: loadPhase.bytes,
+      error: checks[2].passed ? '' : `error rate ${loadPhase.errorRate}% above ${CONFIG.thresholds.maxErrorRate}%`,
+    },
+  ];
+
+  const allResults = [...results, ...sloResults];
+  const totalPassed = allResults.filter((entry) => entry.status === 'PASS').length;
+  const totalFailed = allResults.length - totalPassed;
+
   const finishedAt = new Date().toISOString();
   const meta = buildMeta(options, startedAt, finishedAt);
   const report = {
     meta,
-    results,
+    results: allResults,
     endpoints: aggregateByEndpoint(results),
     loadPhase,
     checks,
@@ -298,7 +356,7 @@ async function main() {
 
   fs.mkdirSync(options.reportDir, { recursive: true });
   const reportFile = writeWorkbook(report, path.join(options.reportDir, REPORT_FILES.xlsx));
-  writeCsv(results, path.join(options.reportDir, REPORT_FILES.csv));
+  writeCsv(allResults, path.join(options.reportDir, REPORT_FILES.csv));
   writeJson(report, path.join(options.reportDir, REPORT_FILES.json));
   writeSummaryMarkdown(report, path.join(options.reportDir, REPORT_FILES.markdown));
 
@@ -312,24 +370,23 @@ async function main() {
   }
 
   printSummary({
-    total: results.length,
-    passed,
-    failed,
+    total: allResults.length,
+    passed: totalPassed,
+    failed: totalFailed,
     durationMs,
     reportFile: path.resolve(reportFile),
     checks,
     loadPhase,
   });
 
-  if (failed > 0) {
+  if (totalFailed > 0) {
     console.log('\nFailing scenarios:');
-    for (const result of results.filter((entry) => entry.status === 'FAIL')) {
+    for (const result of allResults.filter((entry) => entry.status === 'FAIL')) {
       console.log(`  ✗ ${result.id} ${result.title} — ${result.error}`);
     }
   }
 
-  const sloFailed = checks.some((check) => !check.passed);
-  if (failed > 0 || sloFailed) process.exit(1);
+  if (totalFailed > 0) process.exit(1);
   process.exit(0);
 }
 
