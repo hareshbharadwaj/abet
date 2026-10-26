@@ -1,0 +1,177 @@
+name: Selenium E2E Tests
+
+# Runs the 300+ case Selenium suite, publishes a styled Excel report and
+# commits the report back to the branch that triggered the run.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'arena/**'
+    paths-ignore:
+      - 'reports/**'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      workers:
+        description: 'Parallel Chrome sessions'
+        required: false
+        default: '4'
+      module:
+        description: 'Limit to a module or code (e.g. buyer, ADM) — blank runs everything'
+        required: false
+        default: ''
+      fail_on_test_failure:
+        description: 'Fail the workflow when a test case fails'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: selenium-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  E2E_BASE_URL: http://127.0.0.1:4173
+  E2E_HEADLESS: 'true'
+  E2E_RETRIES: '1'
+  NODE_OPTIONS: '--max-old-space-size=4096'
+
+jobs:
+  selenium-e2e:
+    name: selenium-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Ensure Google Chrome is available
+        run: |
+          set -e
+          if command -v google-chrome >/dev/null 2>&1; then
+            google-chrome --version
+          elif command -v google-chrome-stable >/dev/null 2>&1; then
+            google-chrome-stable --version
+          else
+            echo "Chrome not found — installing Chrome for Testing"
+            INSTALL_PATH=$(npx --yes @puppeteer/browsers install chrome@stable | tail -n 1 | awk '{print $2}')
+            echo "CHROME_BIN=${INSTALL_PATH}/chrome" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build application
+        env:
+          # Keep the AI advisor deterministic: the suite exercises the local fallback.
+          VITE_GEMINI_API_KEY: ''
+        run: npm run build
+
+      - name: Start preview server
+        run: |
+          set -e
+          nohup npx vite preview --host 127.0.0.1 --port 4173 --strictPort > preview.log 2>&1 &
+          echo $! > preview.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4173 >/dev/null; then
+              echo "Preview server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview server did not start"
+          cat preview.log
+          exit 1
+
+      - name: Show test catalogue
+        run: node tests/selenium/selenium-suite.js --list | tail -n 20
+
+      - name: Run Selenium E2E suite
+        id: suite
+        continue-on-error: true
+        env:
+          E2E_WORKERS: ${{ github.event.inputs.workers || '4' }}
+        run: |
+          set -o pipefail
+          ARGS="--workers=${E2E_WORKERS} --report-dir=reports"
+          if [ -n "${{ github.event.inputs.module }}" ]; then
+            ARGS="$ARGS --module=${{ github.event.inputs.module }}"
+          fi
+          node tests/selenium/selenium-suite.js $ARGS
+
+      - name: Upload Excel and machine-readable reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-e2e-report-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            reports/selenium-e2e-report.xlsx
+            reports/selenium-e2e-report.csv
+            reports/selenium-results.json
+            reports/selenium-junit.xml
+            reports/selenium-summary.md
+            reports/selenium-test-cases.csv
+            reports/screenshots/**
+            preview.log
+
+      - name: Publish job summary
+        if: always()
+        run: |
+          if [ -f reports/selenium-summary.md ]; then
+            cat reports/selenium-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit Excel report to the branch
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f reports/selenium-e2e-report.xlsx reports/selenium-e2e-report.csv \
+                       reports/selenium-summary.md reports/selenium-test-cases.csv
+          if git diff --staged --quiet; then
+            echo "Report is unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "test(selenium): update E2E report [skip ci]"
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f preview.pid ]; then
+            kill "$(cat preview.pid)" 2>/dev/null || true
+          fi
+
+      - name: Fail the job when tests failed
+        if: always() && steps.suite.outcome == 'failure'
+        env:
+          FAIL_ON_FAILURE: ${{ github.event.inputs.fail_on_test_failure || 'true' }}
+        run: |
+          if [ "$FAIL_ON_FAILURE" = "false" ]; then
+            echo "Test failures were reported but the job is allowed to pass."
+            exit 0
+          fi
+          echo "One or more Selenium test cases failed — see the Excel report artifact."
+          exit 1

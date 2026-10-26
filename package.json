@@ -26,7 +26,11 @@
 
     "test:e2e": "node tests/e2e-runner.js",
 
-    "report:e2e": "node tests/csv-to-xlsx.js"
+    "report:e2e": "node tests/csv-to-xlsx.js",
+
+    "test:selenium": "node tests/selenium/selenium-suite.js",
+    "test:selenium:list": "node tests/selenium/selenium-suite.js --list",
+    "preview:test": "vite preview --port 4173 --strictPort"
 
   },
 

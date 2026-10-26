@@ -36,3 +36,11 @@ dist-ssr
 tests/e2e-report*.xlsx
 tests/e2e-report.csv
 tests/error-screenshot.png
+
+# Selenium E2E generated artefacts (the Excel report is committed by CI)
+reports/screenshots/
+reports/selenium-results.json
+reports/selenium-junit.xml
+reports/preview.log
+preview.log
+reports/dev/
