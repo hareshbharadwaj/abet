@@ -1,9 +1,9 @@
 ## ✅ Load Test — 303/303 cases passed (100.0%)
 
-- **Ref:** `arena/b28508eb-abet` · **Commit:** `581c970`
+- **Ref:** `arena/b28508eb-abet` · **Commit:** `0548411`
 - **Target:** http://127.0.0.1:4173
-- **Scenario phase:** 22.6s · concurrency 10
-- **Load phase:** 2420 requests in 20.27s · 119.36 req/s · p95 732.2ms · 0% errors
+- **Scenario phase:** 22.2s · concurrency 10
+- **Load phase:** 3033 requests in 20.21s · 150.04 req/s · p95 606.2ms · 0% errors
 
 | Category | Cases | Passed | Failed | Status |
 | --- | ---: | ---: | ---: | --- |
@@ -20,8 +20,8 @@
 
 | SLO | Measured | Threshold | Result |
 | --- | ---: | ---: | --- |
-| Throughput (req/s) | 119.36 | ≥ 5 | ✅ PASS |
-| p95 latency (ms) | 732.2 | ≤ 3000 | ✅ PASS |
+| Throughput (req/s) | 150.04 | ≥ 5 | ✅ PASS |
+| p95 latency (ms) | 606.2 | ≤ 3000 | ✅ PASS |
 | Error rate (%) | 0 | ≤ 1 | ✅ PASS |
 
 ### Report
