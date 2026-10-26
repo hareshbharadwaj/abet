@@ -18,9 +18,31 @@ export interface ChatMessage {
 }
 
 const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY || "").trim();
+/**
+ * The key is sent with the `x-goog-api-key` header (never in the query string)
+ * so it cannot leak through proxies, logs or `Referer` headers.
+ */
 const GEMINI_URL = GEMINI_API_KEY
-  ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
+  ? "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
   : "";
+
+/** Bounded retry helper: max 2 additional attempts with linear backoff. */
+async function fetchWithRetry(input: string, init: RequestInit, attempts = 2): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (response.status < 500) return response;
+      lastError = new Error(`Upstream responded ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
+}
 
 const SITE_KNOWLEDGE_SYSTEM_PROMPT = `
 You are "Zee", the friendly, highly knowledgeable AI Microgreens Recommendation Agent for A2ZEE MicroGreenz (a2zeemicrogreenz.com).
@@ -253,10 +275,11 @@ CONVERSATIONAL GUIDELINES:
         }
       };
 
-      const response = await fetch(GEMINI_URL, {
+      const response = await fetchWithRetry(GEMINI_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY,
         },
         body: JSON.stringify(payload),
       });

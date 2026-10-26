@@ -488,6 +488,8 @@ export function LandingPage() {
                   type="text"
                   placeholder="Search by name, Tamil name, or nutrient (e.g. Iron, Protein)..."
                   value={searchQuery}
+                  maxLength={60}
+                  aria-label="Search the microgreen catalogue"
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-12 pr-12 py-3.5 rounded-full border border-emerald-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm shadow-md transition-all duration-300 placeholder:text-gray-400"
                 />

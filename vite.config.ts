@@ -24,7 +24,7 @@ function figmaAssetResolver() {
 const SECURITY_HEADERS: Record<string, string> = {
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://smtpjs.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",

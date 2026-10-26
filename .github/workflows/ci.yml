@@ -26,6 +26,10 @@ jobs:
       - name: Install Dependencies
         run: npm install --ignore-scripts
 
+      - name: Dependency security audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Build Project
         run: npm run build
 

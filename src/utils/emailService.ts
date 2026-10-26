@@ -3,6 +3,27 @@ import { LOGO_DATA_URI } from './logoDataUri';
 import { SEAL_SIGNATURE_DATA_URI } from './sealDataUri';
 
 /**
+ * Escapes a value before it is interpolated into an HTML template.
+ *
+ * Invoice and e-mail templates are assembled with string concatenation and then
+ * rendered with `dangerouslySetInnerHTML` (invoice preview / print), so every
+ * user-controlled field must be escaped to prevent stored XSS.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Escapes a value that is going to be used inside an HTML attribute value. */
+const escapeAttr = (value: unknown): string => escapeHtml(value);
+
+
+
+/**
  * Helper to safely parse any date format (Firestore Timestamp, object with seconds/_seconds, ISO string, or number)
  */
 export function parseOrderDate(dateVal: any): Date {
@@ -107,6 +128,16 @@ Thank you for supporting fresh, organic microgreen superfoods towards a healthy 
  * Formats the invoice as a beautiful, dark-mode PDF/Print layout.
  */
 export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_URI, sealSrc: string = SEAL_SIGNATURE_DATA_URI): string {
+  // Scrub every user-controlled value once, then interpolate the safe copies.
+  const customerName = escapeHtml(order.userName);
+  const orderRef = escapeHtml(order.id);
+  const addr = {
+    line1: escapeHtml(order.address?.line1 || ''),
+    line2: escapeHtml(order.address?.line2 || ''),
+    city: escapeHtml(order.address?.city || ''),
+    state: escapeHtml(order.address?.state || ''),
+    pincode: escapeHtml(order.address?.pincode || ''),
+  };
   const dateObj = parseOrderDate(order.createdAt);
   const dateStr = dateObj.toLocaleDateString('en-IN');
   const dueDateObj = new Date(dateObj);
@@ -121,7 +152,7 @@ export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_UR
     itemsRows += `
       <tr style="border-bottom: 1px solid #333333;">
         <td style="padding: 12px; text-align: center; color: #ffffff; font-family: sans-serif; font-size: 13px;">${item.quantity}</td>
-        <td style="padding: 12px; text-align: left; color: #ffffff; font-family: sans-serif; font-size: 13px;">${item.productName}</td>
+        <td style="padding: 12px; text-align: left; color: #ffffff; font-family: sans-serif; font-size: 13px;">${escapeHtml(item.productName)}</td>
         <td style="padding: 12px; text-align: right; color: #ffffff; font-family: sans-serif; font-size: 13px;">₹${item.price.toFixed(2)}</td>
         <td style="padding: 12px; text-align: center; color: #ffffff; font-family: sans-serif; font-size: 13px;">${unitLabel}</td>
         <td style="padding: 12px; text-align: right; color: #ffffff; font-family: sans-serif; font-size: 13px; font-weight: 700;">₹${rowAmount}</td>
@@ -140,7 +171,7 @@ export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_UR
         <tr>
           <td style="vertical-align: middle; text-align: left;">
             <div style="background-color: #ffffff; padding: 6px; border-radius: 12px; width: 72px; height: 72px; display: inline-block; vertical-align: middle; margin-right: 15px; box-sizing: border-box; overflow: hidden;">
-              <img src="${activeLogo}" alt="A2Zee Logo" width="60" height="60" style="width: 60px; height: 60px; min-width: 60px; min-height: 60px; display: block; border: none;" />
+              <img src="${escapeAttr(activeLogo)}" alt="A2Zee Logo" width="60" height="60" style="width: 60px; height: 60px; min-width: 60px; min-height: 60px; display: block; border: none;" />
             </div>
             <div style="display: inline-block; vertical-align: middle; text-align: left;">
               <strong style="font-size: 18px; font-weight: 800; color: #ffffff; display: block; margin-bottom: 4px; font-family: sans-serif;">A2Zee Microgreenz Pvt. Ltd.</strong>
@@ -161,10 +192,10 @@ export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_UR
         <tr>
           <td style="width: 55%; vertical-align: top; text-align: left; padding-right: 15px;">
             <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #f59e0b; font-weight: 800; display: block; margin-bottom: 8px; font-family: sans-serif;">BILL TO</span>
-            <strong style="font-size: 16px; font-weight: 800; color: #ffffff; display: block; margin-bottom: 6px; font-family: sans-serif;">${order.userName}</strong>
+            <strong style="font-size: 16px; font-weight: 800; color: #ffffff; display: block; margin-bottom: 6px; font-family: sans-serif;">${customerName}</strong>
             <span style="font-size: 12px; color: #a3a3a3; display: block; line-height: 1.4; font-family: sans-serif;">
-              ${order.address.line1}${order.address.line2 ? ' ,' + order.address.line2 : ''}<br />
-              ${order.address.city}, ${order.address.state} - ${order.address.pincode}
+              ${addr.line1}${addr.line2 ? ' ,' + addr.line2 : ''}<br />
+              ${addr.city}, ${addr.state} - ${addr.pincode}
             </span>
             <span style="font-size: 12px; color: #a3a3a3; display: block; margin-top: 6px; font-family: sans-serif;">GST: 33AAQFT9606F1ZW</span>
           </td>
@@ -172,7 +203,7 @@ export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_UR
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
                 <td style="padding: 4px 0; color: #a3a3a3; font-size: 12px; font-family: sans-serif; text-align: right; font-weight: 600;">Invoice #:</td>
-                <td style="padding: 4px 0; color: #ffffff; font-size: 12px; font-family: monospace; font-weight: 700; text-align: right;">${order.id}</td>
+                <td style="padding: 4px 0; color: #ffffff; font-size: 12px; font-family: monospace; font-weight: 700; text-align: right;">${orderRef}</td>
               </tr>
               <tr>
                 <td style="padding: 4px 0; color: #a3a3a3; font-size: 12px; font-family: sans-serif; text-align: right; font-weight: 600;">Invoice Date:</td>
@@ -238,7 +269,7 @@ export function generateInvoiceHTML(order: Order, logoSrc: string = LOGO_DATA_UR
             <td style="width: 45%; vertical-align: bottom; text-align: right;">
               <div style="display: inline-block; text-align: center;">
                 <div style="background-color: #ffffff; padding: 6px 10px; border-radius: 10px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                  <img src="${activeSeal}" alt="A2Zee Seal & Signature" style="height: 55px; width: auto; max-width: 190px; display: block; border: none;" />
+                  <img src="${escapeAttr(activeSeal)}" alt="A2Zee Seal & Signature" style="height: 55px; width: auto; max-width: 190px; display: block; border: none;" />
                 </div>
 
                 <span style="font-size: 10px; color: #a3a3a3; display: block; margin-top: 4px; font-family: sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Authorized Signatory</span>
@@ -271,7 +302,7 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
     ? (isLocal ? 'https://a2zee-8c9b1.web.app/' : `${window.location.origin}${window.location.pathname}`)
     : 'https://a2zee-8c9b1.web.app/';
   const cleanOrigin = baseOrigin.endsWith('/') ? baseOrigin : `${baseOrigin}/`;
-  const invoiceWebUrl = `${cleanOrigin}#/invoice/${order.id}`;
+  const invoiceWebUrl = `${cleanOrigin}#/invoice/${escapeAttr(order.id)}`;
 
   const statusConfig: Record<string, { mainTitle: string; subText: string; desc: string }> = {
     pending: {
@@ -323,10 +354,10 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
           <table style="border-collapse: collapse;">
             <tr>
               <td style="width: 50px; padding-right: 12px; vertical-align: middle;">
-                <img src="${itemImg}" alt="${item.productName}" width="50" height="50" style="width: 50px; height: 50px; border-radius: 12px; object-fit: cover; display: block; border: 1px solid #e2e8f0;" />
+                <img src="${itemImg}" alt="${escapeHtml(item.productName)}" width="50" height="50" style="width: 50px; height: 50px; border-radius: 12px; object-fit: cover; display: block; border: 1px solid #e2e8f0;" />
               </td>
               <td style="vertical-align: middle;">
-                <span style="font-weight: 800; font-size: 14px; color: #1e293b; font-family: sans-serif; display: block;">${item.productName}</span>
+                <span style="font-weight: 800; font-size: 14px; color: #1e293b; font-family: sans-serif; display: block;">${escapeHtml(item.productName)}</span>
               </td>
             </tr>
           </table>
@@ -353,7 +384,7 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
       <tr>
         <td style="text-align: left; font-family: sans-serif;">Thank you for choosing A2ZEE Microgreens!</td>
         <td style="text-align: right; font-family: sans-serif;">
-          <a href="${invoiceWebUrl}" target="_blank" style="color: #718096; text-decoration: underline;">View this email in your browser</a>
+          <a href="${invoiceWebUrl}" target="_blank" rel="noopener noreferrer" style="color: #718096; text-decoration: underline;">View this email in your browser</a>
         </td>
       </tr>
     </table>
@@ -402,7 +433,7 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
             </h1>
 
             <p style="margin: 12px 0 6px 0; font-size: 15px; font-weight: 800; color: #1b4332; font-family: sans-serif;">
-              Hello <span style="color: #2e7d32;">${order.userName}</span>,
+              Hello <span style="color: #2e7d32;">${escapeHtml(order.userName)}</span>,
             </p>
 
             <p style="margin: 0 0 10px 0; font-size: 13px; color: #374151; line-height: 1.5; font-family: sans-serif;">
@@ -441,7 +472,7 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
             </table>
           </td>
           <td style="text-align: right; vertical-align: middle; font-family: sans-serif;">
-            <div style="font-size: 13px; font-weight: 800; color: #1b4332;">Order ID: #${order.id}</div>
+            <div style="font-size: 13px; font-weight: 800; color: #1b4332;">Order ID: #${escapeHtml(order.id)}</div>
             <div style="font-size: 11px; color: #718096; margin-top: 2px;">Date: ${dateStr}</div>
           </td>
         </tr>
@@ -514,7 +545,7 @@ export function generateOrderNotificationHTML(order: Order, statusOverride?: str
             </table>
           </td>
           <td style="vertical-align: middle; text-align: right; width: 160px; font-family: sans-serif;">
-            <a href="${invoiceWebUrl}" target="_blank" style="display: inline-block; background-color: #2e7d32; color: #ffffff; font-weight: 800; font-size: 12px; padding: 10px 16px; border-radius: 12px; text-decoration: none; text-align: center;">
+            <a href="${invoiceWebUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #2e7d32; color: #ffffff; font-weight: 800; font-size: 12px; padding: 10px 16px; border-radius: 12px; text-decoration: none; text-align: center;">
               📥 Download Invoice
             </a>
           </td>

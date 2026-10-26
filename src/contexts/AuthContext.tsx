@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
 import { auth, firestore } from '../config/firebase';
-import { userStorage } from '../utils/localStorage';
+import { cartStorage, userStorage } from '../utils/localStorage';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -195,13 +195,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return superAdminUser;
     }
 
+    /**
+     * Rejects accounts an administrator has blocked or that are still awaiting
+     * approval. Throwing here keeps the session out of the auth context.
+     */
+    const assertAccountUsable = (account: User): User => {
+      const status = String(account.status || 'active').toLowerCase();
+      if (status === 'blocked') {
+        throw new Error('This account has been blocked. Please contact support.');
+      }
+      if (status === 'pending') {
+        throw new Error('This account is awaiting administrator approval.');
+      }
+      return account;
+    };
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
       try {
         const userDoc = await getDoc(doc(firestore, 'users', userCredential.user.uid));
         if (userDoc.exists()) {
-          const userData = userDoc.data() as User;
-          userData.createdAt = normalizeCreatedAt(userData.createdAt);
+          const userData = assertAccountUsable({
+            ...(userDoc.data() as User),
+            createdAt: normalizeCreatedAt((userDoc.data() as User).createdAt),
+          });
           setUser(userData);
           userStorage.setCurrentUser(userData);
           return userData;
@@ -209,24 +226,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {
         console.warn("Firestore fetch during signIn failed, trying localStorage:", err);
       }
-      
+
       // Check localStorage if Firestore read failed
       const localUser = userStorage.getUsers().find(u => u.email.toLowerCase() === cleanEmail);
       if (localUser) {
-        setUser(localUser);
-        userStorage.setCurrentUser(localUser);
-        return localUser;
+        const usable = assertAccountUsable(localUser);
+        setUser(usable);
+        userStorage.setCurrentUser(usable);
+        return usable;
       }
-      throw new Error("User data not found in database.");
+      // Deliberately generic: never reveal whether an email address is registered.
+      throw new Error('Invalid email or password.');
     } catch (error: any) {
       console.warn("Firebase Auth signIn failed, checking localStorage fallback:", error.message);
       const localUser = userStorage.getUsers().find(u => u.email.toLowerCase() === cleanEmail);
       if (localUser) {
-        setUser(localUser);
-        userStorage.setCurrentUser(localUser);
-        return localUser;
+        const usable = assertAccountUsable(localUser);
+        setUser(usable);
+        userStorage.setCurrentUser(usable);
+        return usable;
       }
-      throw error;
+      if (/blocked|awaiting administrator approval/i.test(error.message || '')) throw error;
+      throw new Error('Invalid email or password.');
     }
   };
 
@@ -301,6 +322,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.removeItem('mockSuperAdmin');
     localStorage.removeItem('mockSuperAdmin');
     userStorage.clearCurrentUser();
+    // Shared-device privacy: never leave the previous buyer's cart behind.
+    cartStorage.clearCart();
     try {
       await firebaseSignOut(auth);
     } catch (e) {

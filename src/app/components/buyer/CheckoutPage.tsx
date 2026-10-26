@@ -119,6 +119,10 @@ export function CheckoutPage() {
                         value={address.name}
                         onChange={(e) => setAddress({ ...address, name: e.target.value })}
                         placeholder="John Doe"
+                        required
+                        autoComplete="name"
+                        maxLength={80}
+                        aria-required="true"
                         className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                       />
                     </div>
@@ -130,6 +134,14 @@ export function CheckoutPage() {
                         value={address.phone}
                         onChange={(e) => setAddress({ ...address, phone: e.target.value })}
                         placeholder="+91 1234567890"
+                        required
+                        autoComplete="tel"
+                        inputMode="tel"
+                        pattern="[+]?[0-9\s-]{10,15}"
+                        minLength={10}
+                        maxLength={15}
+                        title="Enter a 10–15 digit phone number"
+                        aria-required="true"
                         className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                       />
                     </div>
@@ -142,6 +154,10 @@ export function CheckoutPage() {
                       value={address.line1}
                       onChange={(e) => setAddress({ ...address, line1: e.target.value })}
                       placeholder="House/Flat no, Building name"
+                      required
+                      autoComplete="address-line1"
+                      maxLength={120}
+                      aria-required="true"
                       className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                     />
                   </div>
@@ -153,6 +169,8 @@ export function CheckoutPage() {
                       value={address.line2}
                       onChange={(e) => setAddress({ ...address, line2: e.target.value })}
                       placeholder="Street, Area"
+                      autoComplete="address-line2"
+                      maxLength={120}
                       className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                     />
                   </div>
@@ -165,6 +183,10 @@ export function CheckoutPage() {
                         value={address.city}
                         onChange={(e) => setAddress({ ...address, city: e.target.value })}
                         placeholder="Mumbai"
+                        required
+                        autoComplete="address-level2"
+                        maxLength={60}
+                        aria-required="true"
                         className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                       />
                     </div>
@@ -175,6 +197,10 @@ export function CheckoutPage() {
                         value={address.state}
                         onChange={(e) => setAddress({ ...address, state: e.target.value })}
                         placeholder="Maharashtra"
+                        required
+                        autoComplete="address-level1"
+                        maxLength={60}
+                        aria-required="true"
                         className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                       />
                     </div>
@@ -185,6 +211,14 @@ export function CheckoutPage() {
                         value={address.pincode}
                         onChange={(e) => setAddress({ ...address, pincode: e.target.value })}
                         placeholder="400001"
+                        required
+                        autoComplete="postal-code"
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        minLength={6}
+                        maxLength={6}
+                        title="Enter the 6-digit PIN code"
+                        aria-required="true"
                         className="h-12 rounded-xl bg-gray-50 border-gray-100 focus:bg-white focus:border-green-300 transition-all"
                       />
                     </div>

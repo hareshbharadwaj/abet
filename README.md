@@ -258,6 +258,78 @@ pnpm build
 
 4. Set up custom domain and SSL certificate
 
+## Automated Test Suites
+
+Every push to `main` / `master` / `arena/**` runs three independent GitHub
+Actions workflows (`.github/workflows/`):
+
+| Workflow | File | Cases | Report |
+| --- | --- | --- | --- |
+| Selenium E2E | `selemiumtest.yml` | 329 UI cases | `reports/selenium-e2e-report.xlsx` |
+| Load testing | `loadtest.yml` | 300 HTTP scenarios + SLOs | `reports/Load_Test_Analysis_Report.xlsx` |
+| Vulnerability testing | `vulnerabilitytest.yml` | 350 security controls | `reports/Vulnerability_Test_Report.xlsx` |
+
+Run them locally:
+
+```bash
+npm run build
+npm run preview:test            # serves the build on http://127.0.0.1:4173
+npm run test:selenium           # Selenium UI suite
+npm run test:load               # HTTP load suite
+npm run test:security           # security audit (source + bundle + headers)
+```
+
+Each workflow uploads its workbook as a build artifact **and** commits it back
+to the triggering branch, so the report in `reports/` always matches the latest
+run.
+
+## Security Controls
+
+- **Transport headers** — CSP, `X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`, `Permissions-Policy`, COOP/CORP and HSTS are applied by
+  `vite preview` (see `vite.config.ts`) and declared for production in
+  `netlify.toml`.
+- **No third-party runtime scripts** — email delivery calls the Brevo / EmailJS
+  REST APIs directly, so the CSP script allow-list only needs the Razorpay
+  checkout bundle.
+- **Output encoding** — invoice and e-mail templates escape every interpolated
+  field (`escapeHtml` in `src/utils/emailService.ts`); printing uses an isolated
+  Blob document instead of injecting markup into the opener window.
+- **Authentication** — Firebase email/password, blocked or unapproved accounts
+  are rejected at sign-in with a generic error that does not disclose whether an
+  address is registered; signing out clears the cached profile and cart.
+- **Secrets** — all keys come from `VITE_*` environment variables; the Gemini key
+  is sent as an `x-goog-api-key` header instead of a query parameter.
+- **Dependency hygiene** — `npm audit` runs in CI, the lockfile is committed, and
+  third-party licences are listed in `THIRD-PARTY-NOTICES.md`.
+
+## Cookies and Local Storage
+
+The app sets **no cookies** and runs **no analytics or advertising trackers**.
+All client state is stored in `localStorage` under the `a2zee_*` namespace:
+
+| Key | Contents | Lifetime |
+| --- | --- | --- |
+| `a2zee_users` | Offline account mirror used for local fallback | Until cleared |
+| `a2zee_current_user` | Cached profile for the signed-in account | Cleared on sign-out |
+| `a2zee_products` | Cached catalogue for offline browsing | Until cleared |
+| `a2zee_cart` | Cart line items | Cleared on sign-out |
+| `a2zee_orders` | Order history mirror | Until cleared |
+| `a2zee_reviews` | Review mirror | Until cleared |
+
+No payment instrument data is ever persisted client-side.
+
+## Branch and Release Workflow
+
+1. Branch from `main` using `feature/<topic>` or `fix/<topic>`.
+2. Push the branch — all three test workflows run and commit their reports.
+3. Open a pull request; `.github/CODEOWNERS` requests the required review.
+4. Merge with a squash commit once **Selenium E2E**, **Load Testing** and
+   **Vulnerability Testing** are green.
+5. Tag the release and deploy from `main` (Netlify builds `dist/`).
+
+Workflow report commits use `[skip ci]` so they never re-trigger the pipeline.
+
 ## Security Notes
 
 ⚠️ **Important**: This is a prototype/demo application. For production use:

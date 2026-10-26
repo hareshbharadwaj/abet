@@ -7,6 +7,7 @@ import { Button } from '../ui/button';
 import { ArrowLeft, Download, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateInvoiceHTML } from '../../../utils/emailService';
+import { printHtmlDocument } from '../../../utils/printDocument';
 import { LOGO_DATA_URI } from '../../../utils/logoDataUri';
 import { SEAL_SIGNATURE_ORIGINAL_DATA_URI } from '../../../utils/sealDataUri';
 
@@ -219,26 +220,7 @@ export function PublicInvoicePage() {
           <div className="flex gap-2">
             <Button
               onClick={() => {
-                const printWindow = window.open('', '_blank');
-                if (printWindow) {
-                  printWindow.document.write(`
-                    <html>
-                      <head>
-                        <title>Invoice - ${order.id}</title>
-                        <style>
-                          body { margin: 20px; background-color: #1a1a1a; font-family: sans-serif; }
-                        </style>
-                      </head>
-                      <body>
-                        ${generateInvoiceHTML(order)}
-                        <script>
-                          window.onload = function() { window.print(); }
-                        </script>
-                      </body>
-                    </html>
-                  `);
-                  printWindow.document.close();
-                }
+                printHtmlDocument(generateInvoiceHTML(order), `Invoice - ${order.id}`);
               }}
               variant="outline"
               className="rounded-xl font-bold text-xs h-9 border-[#333333] bg-[#1a1a1a] text-white hover:bg-[#252525] flex items-center gap-1.5"

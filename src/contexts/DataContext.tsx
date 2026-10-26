@@ -380,13 +380,31 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getCartTotal = (): number => {
-    return cart.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+    return cart.reduce(
+      (total, item) => total + Number(item.product.price) * Math.max(1, Number(item.quantity)),
+      0
+    );
   };
 
   // Order functions
   const createOrder = async (items: CartItem[], address: Address, paymentMethod: 'razorpay' | 'cod'): Promise<Order> => {
     if (!user) {
       throw new Error('User must be logged in to create order');
+    }
+
+    // Normalise the delivery address once: trim every field and clamp lengths
+    // so persisted orders never carry padded or oversized user input.
+    const safeAddress: Address = {
+      name: String(address.name || '').trim().slice(0, 80),
+      phone: String(address.phone || '').replace(/[^0-9+]/g, '').slice(0, 15),
+      line1: String(address.line1 || '').trim().slice(0, 120),
+      line2: String(address.line2 || '').trim().slice(0, 120),
+      city: String(address.city || '').trim().slice(0, 60),
+      state: String(address.state || '').trim().slice(0, 60),
+      pincode: String(address.pincode || '').replace(/[^0-9]/g, '').slice(0, 6),
+    };
+    if (!safeAddress.name || !safeAddress.line1 || !safeAddress.city || !safeAddress.pincode) {
+      throw new Error('A complete delivery address is required');
     }
 
     // Group items by sellerId to match "Unique Seller" requirement
@@ -409,12 +427,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       const orderItems: OrderItem[] = sellerItems.map(item => ({
         productId: item.productId,
         productName: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
+        price: Number(item.product.price),
+        quantity: Number(item.quantity),
         imageUrl: item.product.imageUrl,
       }));
 
-      const subtotal = sellerItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const subtotal = sellerItems.reduce(
+        (sum, item) => sum + Number(item.product.price) * Number(item.quantity),
+        0
+      );
       // Android threshold is 199
       const deliveryFee = 0;
       const totalAmount = subtotal;
@@ -425,20 +446,12 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         id: orderId,
         userId: user.uid,
         userName: user.name,
-        userPhone: user.phone || address.phone,
+        userPhone: user.phone || safeAddress.phone,
         userEmail: user.email,
         orderSource: 'app' as const,
         items: orderItems,
         totalAmount,
-        address: {
-          name: address.name,
-          phone: address.phone,
-          line1: address.line1,
-          line2: address.line2 || "",
-          city: address.city,
-          state: address.state,
-          pincode: address.pincode,
-        },
+        address: safeAddress,
         status: 'pending',
         paymentMethod,
         paymentStatus: paymentMethod === 'cod' ? 'pending' : 'completed',

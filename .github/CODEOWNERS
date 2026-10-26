@@ -1,0 +1,14 @@
+# Security and release ownership
+# Every change requires review from the repository owner.
+
+*                       @hareshbharadwaj
+
+# Security-sensitive surfaces need an explicit owner review.
+/.github/workflows/     @hareshbharadwaj
+/vite.config.ts         @hareshbharadwaj
+/netlify.toml           @hareshbharadwaj
+/index.html             @hareshbharadwaj
+/src/contexts/          @hareshbharadwaj
+/src/config/            @hareshbharadwaj
+/src/utils/emailService.ts @hareshbharadwaj
+/tests/security/        @hareshbharadwaj

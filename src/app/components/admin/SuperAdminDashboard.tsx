@@ -8,6 +8,7 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { generateInvoiceHTML, parseOrderDate } from '../../../utils/emailService';
+import { printHtmlDocument } from '../../../utils/printDocument';
 import { sendAutomatedWhatsAppMessage } from '../../../utils/whatsappService';
 import { LOGO_DATA_URI } from '../../../utils/logoDataUri';
 import { SEAL_SIGNATURE_ORIGINAL_DATA_URI } from '../../../utils/sealDataUri';
@@ -1564,11 +1565,11 @@ Please reply to this message after completing payment (Screenshot of payment). I
               <div className="flex gap-2">
                 <Button 
                   onClick={() => {
-                    const printWindow = window.open('', '_blank');
-                    if (printWindow && viewingInvoiceOrder) {
-                      const htmlStr = '<!DOCTYPE html><html><head><title>Invoice - ' + viewingInvoiceOrder.id + '</title><style>body { margin: 20px; background-color: #1a1a1a; font-family: sans-serif; }</style></head><body>' + generateInvoiceHTML(viewingInvoiceOrder, LOGO_DATA_URI, SEAL_SIGNATURE_ORIGINAL_DATA_URI) + '<script>window.onload = function() { window.print(); };</script></body></html>';
-                      printWindow.document.write(htmlStr);
-                      printWindow.document.close();
+                    if (viewingInvoiceOrder) {
+                      printHtmlDocument(
+                        generateInvoiceHTML(viewingInvoiceOrder, LOGO_DATA_URI, SEAL_SIGNATURE_ORIGINAL_DATA_URI),
+                        `Invoice - ${viewingInvoiceOrder.id}`
+                      );
                     }
                   }}
                   variant="outline" 

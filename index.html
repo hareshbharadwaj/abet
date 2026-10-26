@@ -32,8 +32,11 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <style>html, body { height: 100%; margin: 0; } #root { height: 100%; }</style>
-    <!-- SMTPJS Official Mail Delivery Library -->
-    <script src="https://smtpjs.com/v3/smtp.js"></script>
+    <!--
+      No third-party runtime scripts are loaded here on purpose.
+      Email delivery calls the Brevo / EmailJS REST APIs directly from
+      `src/utils/emailService.ts`, which keeps the CSP allow-list minimal.
+    -->
   </head>
 
   <body>

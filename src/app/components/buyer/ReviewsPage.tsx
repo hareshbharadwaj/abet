@@ -106,6 +106,10 @@ export function ReviewsPage() {
                     placeholder="Share your thoughts about our microgreens, packaging, delivery, or service..."
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
+                    required
+                    minLength={4}
+                    maxLength={600}
+                    aria-required="true"
                   />
                 </div>
 

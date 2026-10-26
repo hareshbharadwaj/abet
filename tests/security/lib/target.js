@@ -13,6 +13,13 @@
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Removes block comments while preserving line numbers, so a rule never
+ * "matches" documentation that merely mentions a risky API.
+ */
+const stripBlockComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, ' '));
+
 const walk = (dir, files = []) => {
   if (!fs.existsSync(dir)) return files;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -69,14 +76,15 @@ export function createTarget({ root, distDir = 'dist', baseUrl = '' }) {
   const matches = (include, pattern) => {
     const hits = [];
     for (const file of pick(include)) {
+      const text = stripBlockComments(file.text);
       const re = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
       let match;
       let count = 0;
-      while ((match = re.exec(file.text)) !== null) {
+      while ((match = re.exec(text)) !== null) {
         count += 1;
         if (hits.length < 4) {
           const start = Math.max(0, match.index - 60);
-          const context = file.text.slice(start, match.index + match[0].length + 80);
+          const context = text.slice(start, match.index + match[0].length + 80);
           hits.push({
             file: file.path,
             snippet: String(context).replace(/\s+/g, ' ').slice(0, 200),

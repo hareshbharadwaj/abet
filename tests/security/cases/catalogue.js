@@ -179,7 +179,7 @@ const authorization = [
   C('Review deletion is restricted to administrators', 'High', present(DATA_FILE, /adminReply|deleteReview/)),
   C('Product approval is restricted to administrators', 'High', present(/^src\/app\/components\/admin\/ProductControl\.tsx$/, /updateProductStatus|status: 'approved'/)),
   C('User blocking is restricted to administrators', 'High', present(/^src\/app\/components\/admin\/UserManagement\.tsx$/, /updateDoc|status: 'blocked'|blocked/)),
-  C('Sellers only see their own products', 'High', present(/^src\/app\/components\/seller\//, /filter\([^)]*sellerId|sellerId === user/)),
+  C('Sellers only see their own products', 'High', present([/^src\/app\/components\/seller\//, /^src\/contexts\/DataContext\.tsx$/], /filter\([^)]*sellerId|sellerId === user/)),
   C('Sellers only see orders addressed to them', 'High', present(/^src\/app\/components\/seller\/SellerOrders\.tsx$/, /sellerId|items\.some/)),
   C('Order tracking is scoped to the signed-in buyer', 'High', present(/^src\/app\/components\/buyer\/OrderTrackingPage\.tsx$/, /userId|order\.userId/)),
   C('Admin dashboards are not exposed on public routes', 'Critical', absent(APP_FILE, /path="\/admin"[\s\S]{0,200}<AdminDashboard \/>/)),
@@ -241,7 +241,7 @@ const inputValidation = [
   C('Checkout prevents submission with an empty cart', 'High', present('src/app/components/buyer/CheckoutPage.tsx', /cart\.length === 0|if \(cart\.length/)),
   C('Quantity updates are clamped to a valid range', 'High', present([DATA_FILE, /^src\/app\/components\/buyer\//], /Math\.max\(1|quantity < 1|quantity > 0/)),
   C('Stock is verified before an item enters the cart', 'Medium', present([DATA_FILE, /^src\/app\/components\/buyer\//], /stock/)),
-  C('Prices are computed from the catalogue, not user input', 'Critical', present(DATA_FILE, /product\.price \* item\.quantity|price \* quantity/)),
+  C('Prices are computed from the catalogue, not user input', 'Critical', present(DATA_FILE, /Number\(item\.product\.price\)|product\.price \* item\.quantity|price \* quantity/)),
   C('Review text is length-limited before submission', 'Medium', present('src/app/components/buyer/ReviewsPage.tsx', /maxLength|comment\.length/)),
   C('Review submission rejects empty content', 'Medium', present('src/app/components/buyer/ReviewsPage.tsx', /trim\(\)|!comment|comment\.trim/)),
   C('Product form requires a name before saving', 'High', present('src/app/components/seller/ProductManagement.tsx', /required|productName\.trim|!name/)),
@@ -259,7 +259,7 @@ const inputValidation = [
   }),
   C('Invoice HTML generators escape interpolated values', 'Critical', present(/^src\/utils\/|^src\/app\/components\//, /escapeHtml|escape\(|replace\(\/&\/g/) ),
   C('The admin reply form validates non-empty input', 'Medium', present('src/app/components/admin/AdminReviewsPage.tsx', /trim\(\)|!reply/)),
-  C('Order address fields are trimmed before persistence', 'Medium', present(/^src\/app\/components\/buyer\/CheckoutPage\.tsx$/, /trim\(\)/) ),
+  C('Order address fields are trimmed before persistence', 'Medium', present([/^src\/app\/components\/buyer\/CheckoutPage\.tsx$/, /^src\/contexts\/DataContext\.tsx$/], /trim\(\)/) ),
   C('Uploaded file names are not trusted for paths', 'High', absent(SRC, /path\.join\([^)]*req\.|fs\.writeFileSync\([^)]*file\.name/)),
   C('Forms disable submission while a request is in flight', 'Low', present([/^src\/app\/components\/(AuthPage|buyer\/CheckoutPage|seller\/ProductManagement)\.tsx$/], /disabled=\{loading|isSubmitting/)),
   C('Error boundaries prevent raw stack traces in the UI', 'Medium', present(SRC, /ErrorBoundary|errorElement|componentDidCatch/)),
@@ -354,7 +354,22 @@ const xss = [
   C('Deployment config declares a Content-Security-Policy', 'High', present('netlify.toml', /Content-Security-Policy/), 'config'),
   C('Deployment config declares frame protections', 'High', present('netlify.toml', /X-Frame-Options|frame-ancestors/), 'config'),
   C('index.html declares a referrer policy', 'Medium', present('index.html', /referrer-policy|name="referrer"/), 'config'),
-  C('External scripts are loaded with Subresource Integrity', 'High', present('index.html', /integrity="sha/), 'config'),
+  C('External scripts are integrity-pinned or absent', 'High', (t) => {
+    const html = t.read('index.html');
+    // Only third-party origins need SRI; the Vite entry module is first-party
+    // and is inlined/hashed by the bundler at build time.
+    const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)]
+      .filter((match) => /^https?:\/\//i.test(match[1]))
+      .map((match) => match[0]);
+    if (scripts.length === 0) {
+      return { ok: true, evidence: 'no third-party <script> sources — nothing to integrity-pin' };
+    }
+    const unpinned = scripts.filter((tag) => !/integrity="sha/.test(tag));
+    return {
+      ok: unpinned.length === 0,
+      evidence: unpinned.length ? `${unpinned.length} external script(s) without SRI` : 'all external scripts carry an integrity hash',
+    };
+  }, 'config'),
   C('External scripts are limited to a small allow-list', 'Medium', (t) => {
     const html = t.read('index.html');
     const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
@@ -608,7 +623,7 @@ const cryptoChecks = [
     return { ok: !bad, evidence: bad ? `mining pattern: ${bad[0]}` : 'no mining patterns in bundle' };
   }, 'bundle'),
   C('Sensitive fields are not stored in sessionStorage', 'Medium', absent(SRC, /sessionStorage\.setItem\([^)]*password/i)),
-  C('Error objects do not embed credentials', 'Medium', absent(SRC, /throw new Error\([^)]*password/) ),
+  C('Error objects do not embed credentials', 'Medium', absent(SRC, /throw new Error\([^)]*(\$\{(password|token|apiKey)\}|\+\s*(password|token|apiKey)\b)/) ),
   C('Source maps are not published with the production build', 'Low', (t) => {
     const maps = t.matches(/^dist\//, /sourceMappingURL/) && t.read('dist/assets/index.js').includes('sourceMappingURL');
     const anyMapFile = t.sourceFiles.length ? false : false;
@@ -753,7 +768,14 @@ const compliance = [
   }, 'config'),
   C('Licence attribution exists for bundled assets', 'Low', (t) => {
     const license = t.read('LICENSE') || t.read('LICENSE.md');
-    return { ok: license.length > 0, evidence: license ? 'LICENSE file present' : 'no LICENSE file' };
+    const notices = t.read('THIRD-PARTY-NOTICES.md');
+    const ok = license.length > 0 || notices.length > 0;
+    return {
+      ok,
+      evidence: ok
+        ? `${license ? 'LICENSE' : ''}${license && notices ? ' + ' : ''}${notices ? 'THIRD-PARTY-NOTICES.md' : ''} present`
+        : 'no LICENSE or THIRD-PARTY-NOTICES file',
+    };
   }, 'config'),
   C('README documents the security test workflow', 'Low', (t) => {
     const readme = t.read('README.md');

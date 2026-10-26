@@ -1,0 +1,57 @@
+PROPRIETARY SOFTWARE LICENCE
+
+Copyright (c) 2026 A2ZEE MICROGREENZ. All rights reserved.
+
+This software, including its source code, user interface, database schemas,
+documentation, test suites and reports (collectively, the "Software"), is the
+exclusive property of A2ZEE MICROGREENZ.
+
+1. NO LICENCE GRANTED
+
+   No right or licence, express or implied, is granted to any person or entity
+   to copy, modify, merge, publish, distribute, sublicense, sell, lease, rent,
+   host, or otherwise make the Software available, in whole or in part, without
+   the prior written permission of A2ZEE MICROGREENZ. Access to this repository
+   does not grant any such right.
+
+2. PERMITTED USE
+
+   Authorised personnel and contractors may view, build, run and test the
+   Software solely for the internal business purposes of A2ZEE MICROGREENZ and
+   under the terms of their engagement. Authorised personnel may make copies of
+   the Software for development, backup and disaster-recovery purposes.
+
+3. RESTRICTIONS
+
+   You may not (a) remove or alter any copyright, trademark or attribution
+   notice; (b) reverse engineer, decompile or disassemble any part of the
+   Software except to the extent permitted by applicable law; (c) use the
+   Software to provide a commercial service to third parties; or (d) use the
+   name, marks or branding of A2ZEE MICROGREENZ without written permission.
+
+4. THIRD-PARTY COMPONENTS
+
+   The Software depends on third-party open-source packages that are licensed
+   under their own terms. Those components remain the property of their
+   respective authors and are not covered by this licence. See
+   THIRD-PARTY-NOTICES.md for the dependency inventory and licences.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT
+   SHALL A2ZEE MICROGREENZ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+   IN CONNECTION WITH THE SOFTWARE OR THE USE OF THE SOFTWARE.
+
+6. TERMINATION
+
+   Any permission granted under this licence terminates automatically upon
+   breach of these terms. On termination you must cease all use of the Software
+   and destroy all copies in your possession or control.
+
+7. CONTACT
+
+   Licensing enquiries: contact the repository owner (@hareshbharadwaj) through
+   GitHub, or the security contact described in README.md.
