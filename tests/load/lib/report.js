@@ -335,12 +335,12 @@ export function writeWorkbook(report, file) {
   /* ================================================================ */
   const standards = [
     ['SLO / SLA Compliance', 'Scenario success rate (status, payload, SLA)', passRate, 100],
-    ['Google Core Web Vitals (Lab)', 'HTML shell response under cold load', scoreAgainst(loadPhase.averageMs, 500), 100],
-    ['HTTP Archive Benchmarks', 'p95 latency across the static asset surface', scoreAgainst(loadPhase.p95Ms, 3000), 100],
+    ['Google Core Web Vitals (Lab)', 'HTML shell response under cold load', scoreAgainst(loadPhase.averageMs, 500, true), 100],
+    ['HTTP Archive Benchmarks', 'p95 latency across the static asset surface', scoreAgainst(loadPhase.p95Ms, 3000, true), 100],
     ['ISO/IEC 25010:2011', 'Performance efficiency — throughput under sustained load', scoreAgainst(loadPhase.rps, 5), 100],
     ['NFR Availability Standard', 'Error rate during sustained load (%)', scoreAgainst(loadPhase.errorRate, 1, true), 100],
-    ['Lighthouse Asset Budget', 'JavaScript bundle delivery latency', scoreAgainst(endpointLatency(endpoints, '.js'), 2500), 100],
-    ['Web Performance Best Practice', 'Static asset cache / reload behaviour', scoreAgainst(endpointLatency(endpoints, '/'), 1500), 100],
+    ['Lighthouse Asset Budget', 'JavaScript bundle delivery latency', scoreAgainst(endpointLatency(endpoints, '.js'), 2500, true), 100],
+    ['Web Performance Best Practice', 'Static asset cache / reload behaviour', scoreAgainst(endpointLatency(endpoints, '/'), 1500, true), 100],
     ['SRE Error Budget', 'Stability across the full scenario catalogue', scoreAgainst(failed, 0, true), 100],
   ];
 
