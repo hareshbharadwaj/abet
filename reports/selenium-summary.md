@@ -1,9 +1,9 @@
 ## ✅ Selenium E2E — 329/329 passed (100.0%)
 
-- **Ref:** `arena/b28508eb-abet` · **Commit:** `581c970`
+- **Ref:** `arena/b28508eb-abet` · **Commit:** `0548411`
 - **Base URL:** http://127.0.0.1:4173
-- **Duration:** 37.1s across 4 parallel Chrome sessions
-- **Failed:** 0 · **Flaky (passed on retry):** 1
+- **Duration:** 56.8s across 4 parallel Chrome sessions
+- **Failed:** 0 · **Flaky (passed on retry):** 0
 
 | Module | Cases | Passed | Failed | Pass rate |
 | --- | ---: | ---: | ---: | ---: |
