@@ -1,0 +1,178 @@
+name: Load Testing
+
+# Runs the 300-case HTTP load suite against the production build, uploads the
+# reports and commits the Excel workbook back to the branch that triggered it.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'arena/**'
+    paths-ignore:
+      - 'reports/**'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      scenarios:
+        description: 'Number of load scenarios'
+        required: false
+        default: '300'
+      concurrency:
+        description: 'Requests in flight (scenario phase)'
+        required: false
+        default: '10'
+      duration:
+        description: 'Sustained load duration in seconds'
+        required: false
+        default: '20'
+      users:
+        description: 'Virtual users during the load phase'
+        required: false
+        default: '20'
+      fail_on_threshold:
+        description: 'Fail the workflow when an SLO is missed'
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: load-test-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  E2E_BASE_URL: http://127.0.0.1:4173
+  LOAD_SCENARIOS: ${{ github.event.inputs.scenarios || '300' }}
+  LOAD_CONCURRENCY: ${{ github.event.inputs.concurrency || '10' }}
+  LOAD_DURATION: ${{ github.event.inputs.duration || '20' }}
+  LOAD_VIRTUAL_USERS: ${{ github.event.inputs.users || '20' }}
+  LOAD_MAX_P95_MS: '3000'
+  LOAD_MAX_ERROR_RATE: '1'
+  LOAD_MIN_RPS: '5'
+
+jobs:
+  load-test:
+    name: load-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start preview server
+        run: |
+          set -e
+          nohup npx vite preview --host 127.0.0.1 --port 4173 --strictPort > preview.log 2>&1 &
+          echo $! > preview.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:4173 >/dev/null; then
+              echo "Preview server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview server did not start"
+          cat preview.log
+          exit 1
+
+      - name: Show scenario catalogue
+        run: node tests/load/load-suite.js --list | tail -n 12
+
+      - name: Run load tests
+        id: suite
+        continue-on-error: true
+        run: |
+          node tests/load/load-suite.js \
+            --scenarios="${LOAD_SCENARIOS}" \
+            --concurrency="${LOAD_CONCURRENCY}" \
+            --duration="${LOAD_DURATION}" \
+            --users="${LOAD_VIRTUAL_USERS}" \
+            --report-dir=reports
+
+      - name: Upload Excel and machine-readable reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-report-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            reports/Load_Test_Analysis_Report.xlsx
+            reports/load-test-results.csv
+            reports/load-test-results.json
+            reports/load-test-summary.md
+            preview.log
+
+      - name: Publish job summary
+        if: always()
+        run: |
+          if [ -f reports/load-test-summary.md ]; then
+            cat reports/load-test-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Commit Excel report to the branch
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f reports/Load_Test_Analysis_Report.xlsx \
+                       reports/load-test-results.csv \
+                       reports/load-test-summary.md
+          if git diff --staged --quiet; then
+            echo "Report is unchanged — nothing to commit"
+            exit 0
+          fi
+          git commit -m "test(load): update load test report [skip ci]"
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "Report pushed on attempt ${attempt}"
+              exit 0
+            fi
+            echo "Push rejected — rebasing on the latest ${GITHUB_REF_NAME}"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            sleep 3
+          done
+          echo "Could not push the report after 3 attempts"
+          exit 1
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f preview.pid ]; then
+            kill "$(cat preview.pid)" 2>/dev/null || true
+          fi
+
+      - name: Fail the job when an SLO was missed
+        if: always() && steps.suite.outcome == 'failure'
+        env:
+          FAIL_ON_THRESHOLD: ${{ github.event.inputs.fail_on_threshold || 'true' }}
+        run: |
+          if [ "$FAIL_ON_THRESHOLD" = "false" ]; then
+            echo "Load test issues were reported but the job is allowed to pass."
+            exit 0
+          fi
+          echo "One or more load scenarios or SLO checks failed — see the Excel report artifact."
+          exit 1

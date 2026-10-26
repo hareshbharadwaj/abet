@@ -44,3 +44,5 @@ reports/selenium-junit.xml
 reports/preview.log
 preview.log
 reports/dev/
+reports/load-test-*
+reports/Load_Test_Analysis_Report.xlsx
