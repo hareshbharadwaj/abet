@@ -42,6 +42,7 @@ export function FirebaseSetupWarning() {
                 href="https://console.firebase.google.com"
                 target="_blank"
                 rel="noopener noreferrer"
+                rel="noopener noreferrer"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Open Firebase Console
@@ -51,6 +52,7 @@ export function FirebaseSetupWarning() {
               <a
                 href="/SETUP_HELP.md"
                 target="_blank"
+                rel="noopener noreferrer"
               >
                 View Setup Guide
               </a>

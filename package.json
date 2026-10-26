@@ -17,7 +17,9 @@
     "test:selenium:list": "node tests/selenium/selenium-suite.js --list",
     "preview:test": "vite preview --port 4173 --strictPort",
     "test:load": "node tests/load/load-suite.js",
-    "test:load:list": "node tests/load/load-suite.js --list"
+    "test:load:list": "node tests/load/load-suite.js --list",
+    "test:security": "node tests/security/security-suite.js",
+    "test:security:list": "node tests/security/security-suite.js --list"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

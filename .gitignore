@@ -46,3 +46,5 @@ preview.log
 reports/dev/
 reports/load-test-*
 reports/Load_Test_Analysis_Report.xlsx
+reports/vulnerability-test-results.json
+reports/vulnerability-summary.md.bak
